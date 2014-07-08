@@ -1,0 +1,9 @@
+[package]
+
+name = "rainstorm"
+version = "0.1.0"
+authors = [ "rwittekcodes@gmail.com" ]
+
+[[lib]]
+name = "rainstorm"
+crate_type = ["dylib"]
