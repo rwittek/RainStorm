@@ -31,9 +31,6 @@ extern "stdcall" {
 	fn Sleep(time: u32);
 }
 
-#[no_mangle]
-static mut REAL_INIT: *const () = 0 as *const ();
-
 pub fn log_print(msg: &str) {
 	unsafe { libc::write(LOG_FD, unsafe { core::mem::transmute(msg.repr().data) }, msg.repr().len as u32); };
 }
@@ -69,7 +66,13 @@ pub extern "C" fn rainstorm_init(_log_fd: libc::c_int) {
 	unsafe {
 	    
 		let mut hooker = sdk::vmthook::VMTHooker::new(ibaseclientdll as *mut *const ());
-		REAL_INIT = hooker.get_orig_method(0);
+		sdk::REAL_INIT = hooker.get_orig_method(0);
+		log_print(
+		if sdk::REAL_INIT.is_null() {
+			"no init?!?"
+		} else {
+			"yay, init"
+		});
 		hooker.hook(0, core::mem::transmute(_Z22hooked_init_trampolinePFPvPKcPiES4_P15CGlobalVarsBase));
 		//engine.ClientCmd("say hello world");
 	};
