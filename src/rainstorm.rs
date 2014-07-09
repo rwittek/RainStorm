@@ -9,14 +9,23 @@ use core::prelude::*;
 mod sdk;
 mod win32;
 
+impl core::fmt::FormatWriter for &[u8] {
+	fn write(&mut self, bytes: &[u8]) -> Result<(), FormatError> {
+		match bytes.len() >= self.len() {
+			true => Err(core::fmt::WriteError),
+			false => {
+				for (idx, byte) in bytes.iter().enumerate() {
+					self[idx] = byte;
+				}
+				self[bytes.len()] = 0; // null terminate
+				Ok(())
+			}
+		}
+	}
+}
 #[no_mangle]
 pub extern "C" fn rainstorm_init(log_fd: libc::c_int) {
 	loop{}
-	
-	rainstorm_setup();
-}
-
-fn rainstorm_setup() {
 	
 	let engine_ref: &mut sdk::ffi::Engine = unsafe {
 		let engine_ptr = sdk::ffi::getptr_engine();
@@ -25,6 +34,7 @@ fn rainstorm_setup() {
 			None => panic("no engine?")
 		}
 	};
+	let x: [u8, ..256] = [0, ..256];
 	println!("Engine is at: {}", engine_ref as *mut sdk::ffi::Engine);
 }
 
