@@ -34,43 +34,46 @@ extern "stdcall" {
 #[no_mangle]
 static mut REAL_INIT: *const () = 0 as *const ();
 
-pub fn log_print(log_fd: libc::c_int, msg: &str) {
-	unsafe { libc::write(log_fd, unsafe { core::mem::transmute(msg.repr().data) }, msg.repr().len as u32); };
+pub fn log_print(msg: &str) {
+	unsafe { libc::write(LOG_FD, unsafe { core::mem::transmute(msg.repr().data) }, msg.repr().len as u32); };
 }
 
 static mut BASECLIENTDLL_HOOKER: Option<sdk::vmthook::VMTHooker> = None;
+static mut LOG_FD: libc::c_int = 0;
 
 #[no_mangle]
-pub extern "C" fn rainstorm_init(log_fd: libc::c_int) {
-	
+pub extern "C" fn rainstorm_init(_log_fd: libc::c_int) {
+	let log_fd = _log_fd;
+	unsafe { LOG_FD = _log_fd; };
 	let engine: * mut sdk::IVEngineClient = unsafe {
 		let engine_ptr = sdk::getptr_ivengineclient();
 		match engine_ptr.is_not_null() {
 			true => { engine_ptr },
-			false => { log_print(log_fd, "Engine not found, dying\n");
+			false => { log_print("Engine not found, dying\n");
 				libc::exit(1);
 			}
 		}
 	};
-	log_print(log_fd, "Engine found.\n");
+	log_print("Engine found.\n");
 	
 	let ibaseclientdll: * mut sdk::IBaseClientDLL = unsafe {
 		let ibaseclientdll_ptr = sdk::getptr_ibaseclientdll();
 		match ibaseclientdll_ptr.is_not_null() {
 			true => { ibaseclientdll_ptr },
-			false => { log_print(log_fd, "IBaseClientDLL not found, dying\n");
+			false => { log_print("IBaseClientDLL not found, dying\n");
 				libc::exit(1);
 			}
 		}
 	};
-	log_print(log_fd, "IBaseClientDLL found.\n");
+	log_print("IBaseClientDLL found.\n");
 
 	unsafe {
-		BASECLIENTDLL_HOOKER = Some(sdk::vmthook::VMTHooker::new(ibaseclientdll as *mut *const ()));
+	    
+		sdk::vmthook::VMTHooker::new(ibaseclientdll as *mut *const ());
 		//BASECLIENTDLL_HOOKER.unwrap().hook(0, core::mem::transmute(_Z22hooked_init_trampolinePFPvPKcPiES4_P15CGlobalVarsBase));
 		//engine.ClientCmd("say hello world");
 	};
-	log_print(log_fd, "Hook installed... let's see!");
+	log_print("Hook installed... let's see!");
 		
 }
 

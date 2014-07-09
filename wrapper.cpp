@@ -46,7 +46,6 @@ HMODULE GetModuleHandleSafe( const char* pszModuleName )
 extern "C" void * getptr_ibaseclientdll() {
 	HMODULE hmClient = GetModuleHandleSafe( "client.dll" );
 	CreateInterfaceFn ClientFactory = ( CreateInterfaceFn ) GetProcAddress( hmClient, "CreateInterface" );
-	ClientFactory ( CLIENT_DLL_INTERFACE_VERSION, NULL );
 	return ClientFactory ( CLIENT_DLL_INTERFACE_VERSION, NULL );
 }
 
