@@ -6,5 +6,5 @@ pub enum Engine {}
 #[link(name="wrapper", kind="static")]
 extern {
 	pub fn getptr_engine() -> * mut Engine; // MAYBE NULL
-	pub fn engine_servercmd(engine: & mut Engine, cmd_string: * const c_char, reliable: bool);
+	pub fn engine_clientcmd(engine: & mut Engine, cmd_string: * const c_char);
 }
