@@ -8,7 +8,6 @@ use core::prelude::*;
 use core::raw::Repr;
 
 mod sdk;
-mod win32;
 
 static mut IVENGINECLIENT_PTR: Option<*mut sdk::IVEngineClient> = None;
 static mut IBASECLIENTDLL_PTR: Option<*mut sdk::IBaseClientDLL> = None;

@@ -1,2 +1,3 @@
 g++ -lstdc++ -DGNUC -D_WIN32 -I sdk_2013/common -I sdk_2013/game/shared  -I sdk_2013/game/shared/sdk -I sdk_2013/game/server -I sdk_2013/game/client/sdk -I sdk_2013/game/client -I sdk_2013\public -I sdk_2013 -I sdk_2013\public\tier0 -I sdk_2013\public\tier1 -march=native -mwindows -c wrapper.cpp -o target\deps\wrapper.o
 ar -rcs target\deps\libwrapper.a target\deps\wrapper.o
+rustc --crate-type=dylib src/rainstorm.rs -L target/deps -C link-args="-mwindows -static"
