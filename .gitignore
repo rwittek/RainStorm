@@ -37,3 +37,4 @@ Icon
 
 target/.rainstorm.fingerprint
 target/rainstorm.dll
+target/deps/*
