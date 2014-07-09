@@ -32,22 +32,52 @@ extern "stdcall" {
 }
 
 #[no_mangle]
+static mut REAL_INIT: *const () = 0 as *const ();
+
+pub fn log_print(log_fd: libc::c_int, msg: &str) {
+	unsafe { libc::write(log_fd, unsafe { core::mem::transmute(msg.repr().data) }, msg.repr().len as u32); };
+}
+
+static mut BASECLIENTDLL_HOOKER: Option<sdk::vmthook::VMTHooker> = None;
+
+#[no_mangle]
 pub extern "C" fn rainstorm_init(log_fd: libc::c_int) {
 	
-	let engine_ref: &mut sdk::ffi::Engine = unsafe {
-		let engine_ptr = sdk::ffi::getptr_engine();
-		match engine_ptr.to_option() {
-			Some(engine_ref) => unsafe { core::mem::transmute(engine_ref) } , // ewww
-			None => panic("no engine?")
+	let engine: * mut sdk::IVEngineClient = unsafe {
+		let engine_ptr = sdk::getptr_ivengineclient();
+		match engine_ptr.is_not_null() {
+			true => { engine_ptr },
+			false => { log_print(log_fd, "Engine not found, dying\n");
+				libc::exit(1);
+			}
 		}
 	};
-	unsafe { libc::write(log_fd, unsafe { core::mem::transmute("Engine found OK!".repr().data) }, 16); }
-		unsafe {
-			sdk::ffi::engine_clientcmd(engine_ref, core::mem::transmute(b"say yo what's up\0".repr().data));
-		};
+	log_print(log_fd, "Engine found.\n");
+	
+	let ibaseclientdll: * mut sdk::IBaseClientDLL = unsafe {
+		let ibaseclientdll_ptr = sdk::getptr_ibaseclientdll();
+		match ibaseclientdll_ptr.is_not_null() {
+			true => { ibaseclientdll_ptr },
+			false => { log_print(log_fd, "IBaseClientDLL not found, dying\n");
+				libc::exit(1);
+			}
+		}
+	};
+	log_print(log_fd, "IBaseClientDLL found.\n");
+
+	unsafe {
+		BASECLIENTDLL_HOOKER = Some(sdk::vmthook::VMTHooker::new(ibaseclientdll as *mut *const ()));
+		//BASECLIENTDLL_HOOKER.unwrap().hook(0, core::mem::transmute(_Z22hooked_init_trampolinePFPvPKcPiES4_P15CGlobalVarsBase));
+		//engine.ClientCmd("say hello world");
+	};
+	log_print(log_fd, "Hook installed... let's see!");
 		
 }
 
+extern "stdcall" {
+	// lol
+	fn _Z22hooked_init_trampolinePFPvPKcPiES4_P15CGlobalVarsBase(app_sys_factory: *mut (), physics_factory: *mut (), globals: *mut ());
+}
 fn panic(msg: &str) -> ! {
 	loop {}
 }

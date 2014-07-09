@@ -42,12 +42,26 @@ HMODULE GetModuleHandleSafe( const char* pszModuleName )
 	return hmModuleHandle;
 }
 
-extern "C" void * getptr_engine() {
+
+extern "C" void * getptr_ibaseclientdll() {
+	HMODULE hmClient = GetModuleHandleSafe( "client.dll" );
+	CreateInterfaceFn ClientFactory = ( CreateInterfaceFn ) GetProcAddress( hmClient, "CreateInterface" );
+	ClientFactory ( CLIENT_DLL_INTERFACE_VERSION, NULL );
+	return ClientFactory ( CLIENT_DLL_INTERFACE_VERSION, NULL );
+}
+
+extern "C" void * getptr_ivengineclient() {
 	HMODULE hmEngine = GetModuleHandleSafe( "engine.dll" );
 	CreateInterfaceFn EngineFactory = ( CreateInterfaceFn ) GetProcAddress( hmEngine, "CreateInterface" );
 	return EngineFactory( VENGINE_CLIENT_INTERFACE_VERSION, NULL );
 }
 
-extern "C" void engine_clientcmd(void *engine_ptr, const char *command) {
+extern "C" void ivengineclient_clientcmd(void *engine_ptr, const char *command) {
 	((IVEngineClient *) engine_ptr)->ClientCmd(command);
+}
+
+int __stdcall (*REAL_INIT1)( CreateInterfaceFn appSysFactory, CreateInterfaceFn physicsFactory, CGlobalVarsBase* pGlobals );
+
+int __stdcall hooked_init_trampoline( CreateInterfaceFn appSysFactory, CreateInterfaceFn physicsFactory, CGlobalVarsBase* pGlobals ) {
+	return (*REAL_INIT1)(appSysFactory, physicsFactory, pGlobals);
 }
