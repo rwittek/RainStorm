@@ -1,4 +1,5 @@
 pub use libc::c_char;
+use libc;
 use core;
 use core::result::{Result, Ok, Err};
 use core::collections::Collection;
@@ -9,6 +10,10 @@ use core::mem::transmute;
 pub enum IVEngineClient {}
 pub enum IBaseClientDLL {}
 pub enum ConVar {}
+pub enum ICVar {}
+pub enum AppSysFactory {}
+pub enum PhysicsFactory {}
+pub enum Globals {}
 
 impl IVEngineClient {
 	pub fn ClientCmd(&mut self, command: &'static str) -> Result<(), &'static str> {
@@ -29,7 +34,11 @@ extern {
 	fn ivengineclient_clientcmd(engine: & mut IVEngineClient, cmd_string: * const c_char);
 	
 	pub fn getptr_ibaseclientdll() -> * mut IBaseClientDLL; // MAYBE NULL
+	pub fn getptr_icvar(app_sys_factory: * mut AppSysFactory) -> * mut ICVar;
 	
+	pub fn icvar_findvar(icvar: * mut ICVar, name: * const char) -> * mut ConVar; // MAYBE NULL;
+	pub fn convar_setvalue_int(cvar: * mut ConVar, value: libc::c_int);
+	pub fn convar_clearflags(cvar: * mut ConVar);
 	pub static mut REAL_INIT: *const ();
 }
 

@@ -38,6 +38,14 @@ pub fn log_print(msg: &str) {
 static mut LOG_FD: libc::c_int = 0;
 
 #[no_mangle]
+pub extern "C" fn rainstorm_inithook(app_sys_factory: *mut sdk::AppSysFactory, physics_factory: *mut sdk::PhysicsFactory, globals: *mut sdk::Globals) {
+	unsafe {
+		let cvar = sdk::getptr_icvar(app_sys_factory);
+		let x = sdk::icvar_findvar(cvar, core::mem::transmute("sv_cheats\0".repr().data));
+		sdk::convar_clearflags(x);
+	}
+}
+#[no_mangle]
 pub extern "C" fn rainstorm_init(_log_fd: libc::c_int) {
 	let log_fd = _log_fd;
 	unsafe { LOG_FD = _log_fd; };

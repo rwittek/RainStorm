@@ -11,6 +11,9 @@
 #include <istream>
 #include <string.h>
 
+#include "convar.h"
+#include "tier1/iconvar.h"
+#include "public/icvar.h"
 #include "public/cdll_int.h"
 
 extern "C" void rainstorm_init(int log_fd);
@@ -55,17 +58,38 @@ extern "C" void * getptr_ivengineclient() {
 	return EngineFactory( VENGINE_CLIENT_INTERFACE_VERSION, NULL );
 }
 
+extern "C" void * getptr_icvar(CreateInterfaceFn AppSysFactory) {
+	return AppSysFactory( CVAR_INTERFACE_VERSION, NULL );
+}
+
+extern "C" void * icvar_findvar(ICvar *icvar, const char *name) {
+	return icvar->FindVar(name);
+}
+
+extern "C" void * convar_setvalue_int(ConVar *cvar, int value) {
+	cvar->SetValue(value);
+}
+
+extern "C" void * convar_clearflags(ConVar *cvar) {
+	cvar->m_nFlags = FCVAR_NONE;
+}
+
+
 extern "C" void ivengineclient_clientcmd(void *engine_ptr, const char *command) {
 	((IVEngineClient *) engine_ptr)->ClientCmd(command);
 }
+
+extern "C" void rainstorm_inithook( CreateInterfaceFn appSysFactory, CreateInterfaceFn physicsFactory, CGlobalVarsBase* pGlobals );
 
 int __stdcall (*REAL_INIT)( CreateInterfaceFn appSysFactory, CreateInterfaceFn physicsFactory, CGlobalVarsBase* pGlobals ) = NULL;
 
 int __stdcall hooked_init_trampoline( CreateInterfaceFn appSysFactory, CreateInterfaceFn physicsFactory, CGlobalVarsBase* pGlobals ) {
 	if (REAL_INIT) {
 		MessageBox(NULL, "oh bother.", NULL, NULL);
+		rainstorm_inithook(appSysFactory, physicsFactory, pGlobals);
+		return (*REAL_INIT)(appSysFactory, physicsFactory, pGlobals);
 	} else {
 		MessageBox(NULL, "no init :(", NULL, NULL);
+		exit(1);
 	}
-	Sleep(10000);
 }
