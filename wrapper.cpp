@@ -62,5 +62,6 @@ extern "C" void ivengineclient_clientcmd(void *engine_ptr, const char *command) 
 int __stdcall (*REAL_INIT1)( CreateInterfaceFn appSysFactory, CreateInterfaceFn physicsFactory, CGlobalVarsBase* pGlobals );
 
 int __stdcall hooked_init_trampoline( CreateInterfaceFn appSysFactory, CreateInterfaceFn physicsFactory, CGlobalVarsBase* pGlobals ) {
-	return (*REAL_INIT1)(appSysFactory, physicsFactory, pGlobals);
+	MessageBox(NULL, "~~ here comes the rain again ~~", NULL, NULL);
+	do { Sleep(10); } while (true);
 }

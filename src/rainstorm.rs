@@ -38,7 +38,6 @@ pub fn log_print(msg: &str) {
 	unsafe { libc::write(LOG_FD, unsafe { core::mem::transmute(msg.repr().data) }, msg.repr().len as u32); };
 }
 
-static mut BASECLIENTDLL_HOOKER: Option<sdk::vmthook::VMTHooker> = None;
 static mut LOG_FD: libc::c_int = 0;
 
 #[no_mangle]
@@ -69,8 +68,9 @@ pub extern "C" fn rainstorm_init(_log_fd: libc::c_int) {
 
 	unsafe {
 	    
-		sdk::vmthook::VMTHooker::new(ibaseclientdll as *mut *const ());
-		//BASECLIENTDLL_HOOKER.unwrap().hook(0, core::mem::transmute(_Z22hooked_init_trampolinePFPvPKcPiES4_P15CGlobalVarsBase));
+		let mut hooker = sdk::vmthook::VMTHooker::new(ibaseclientdll as *mut *const ());
+		REAL_INIT = hooker.get_orig_method(0);
+		hooker.hook(0, core::mem::transmute(_Z22hooked_init_trampolinePFPvPKcPiES4_P15CGlobalVarsBase));
 		//engine.ClientCmd("say hello world");
 	};
 	log_print("Hook installed... let's see!");

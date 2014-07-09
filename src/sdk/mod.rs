@@ -45,36 +45,29 @@ pub mod vmthook {
 	pub struct VMTHooker { // this should be renamed.......
 		original_vmt_ptr_ptr: *const VMT,
 		original_vmt: VMT,
-		patched_vmt: VMT,
+		patched_vmt_ptr: *mut VMT,
 	}
 
 	impl VMTHooker {
-		pub unsafe fn new(vmt_ptr_ptr: *mut *const ()) {
-			
-			{
-				log_print("prepatch: ");
-				let s: &'static str = core::slice::raw::buf_as_slice(vmt_ptr_ptr as *const u8, 4, |s| core::mem::transmute(core::str::raw::from_utf8(s)));
-				log_print(core::mem::transmute(s));
-			};
-			
+		pub unsafe fn new(vmt_ptr_ptr: *mut *const ()) -> VMTHooker {
 			let vmt_ptr: *const VMT = core::mem::transmute(*vmt_ptr_ptr);
-			let yolo = libc::malloc(core::mem::size_of::<VMTHooker>() as u32) as *mut VMTHooker;
-			*yolo = VMTHooker {
+			// yes, we do leak this.
+			// yolo.
+			let new_vmt = libc::malloc(core::mem::size_of::<VMT>() as u32) as *mut VMT;
+			
+			*new_vmt = *vmt_ptr; // christ this had better work
+			let hooker = VMTHooker {
 				original_vmt_ptr_ptr: core::mem::transmute(vmt_ptr_ptr),
 				original_vmt: *vmt_ptr,
-				patched_vmt: *vmt_ptr
+				patched_vmt_ptr: new_vmt
 			};
-			*vmt_ptr_ptr = &((*yolo).patched_vmt) as *const VMT as *const ();
-			{
-				log_print("postpatch: ");
-				let s: &'static str = core::slice::raw::buf_as_slice(vmt_ptr_ptr as *const u8, 4, |s| core::mem::transmute(core::str::raw::from_utf8(s)));
-				log_print(core::mem::transmute(s));
-			};
+			*vmt_ptr_ptr = (new_vmt) as *const VMT as *const ();
 			
+			hooker
 		}
 		
 		pub unsafe fn hook(&mut self, method: uint, hook: *const ()) {
-			self.patched_vmt[method] = hook;
+			(*(self.patched_vmt_ptr))[method] = hook;
 		}
 		
 		pub unsafe fn get_orig_method(&self, method: uint) -> *const () {
