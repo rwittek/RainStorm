@@ -9,22 +9,11 @@ use core::raw::Repr;
 
 mod sdk;
 mod win32;
-/*
-impl<'a> core::fmt::FormatWriter for &'a[u8] {
-	fn write(&mut self, bytes: &[u8]) -> Result<(), core::fmt::FormatError> {
-		match bytes.len() >= self.len() {
-			true => Err(core::fmt::WriteError),
-			false => {
-				for (idx, byte) in bytes.iter().enumerate() {
-					self[idx] = byte;
-				}
-				self[bytes.len()] = 0; // null terminate
-				Ok(())
-			}
-		}
-	}
-}
-*/
+
+static mut IVENGINECLIENT_PTR: Option<*mut sdk::IVEngineClient> = None;
+static mut IBASECLIENTDLL_PTR: Option<*mut sdk::IBaseClientDLL> = None;
+static mut APPSYSFACTORY_PTR: Option<*mut sdk::AppSysFactory> = None;
+static mut ICVAR_PTR: Option<*mut sdk::ICvar> = None;
 
 #[no_mangle]
 extern "stdcall" {
@@ -35,21 +24,24 @@ pub fn log_print(msg: &str) {
 	unsafe { libc::write(LOG_FD, unsafe { core::mem::transmute(msg.repr().data) }, msg.repr().len as u32); };
 }
 
+
 static mut LOG_FD: libc::c_int = 0;
 
 #[no_mangle]
-pub extern "C" fn rainstorm_inithook(app_sys_factory: *mut sdk::AppSysFactory, physics_factory: *mut sdk::PhysicsFactory, globals: *mut sdk::Globals) {
-	unsafe {
-		let cvar = sdk::getptr_icvar(app_sys_factory);
-		let x = sdk::icvar_findvar(cvar, core::mem::transmute("sv_cheats\0".repr().data));
-		sdk::convar_clearflags(x);
-	}
+pub unsafe extern "C" fn rainstorm_inithook(app_sys_factory: *mut sdk::AppSysFactory, physics_factory: *mut sdk::PhysicsFactory, globals: *mut sdk::Globals) {
+		APPSYSFACTORY_PTR = Some(app_sys_factory);
+		ICVAR_PTR = Some(sdk::getptr_icvar(app_sys_factory));
+		let sv_cheats = (*ICVAR_PTR.unwrap()).find_var("sv_cheats");
+		match sv_cheats {
+			Some(cheats) => sdk::convar_clearflags(cheats),
+			None => log_print("No sv_cheats?!"),
+		};
 }
 #[no_mangle]
 pub extern "C" fn rainstorm_init(_log_fd: libc::c_int) {
 	let log_fd = _log_fd;
 	unsafe { LOG_FD = _log_fd; };
-	let engine: * mut sdk::IVEngineClient = unsafe {
+	let IVENGINECLIENT_PTR = Some(unsafe {
 		let engine_ptr = sdk::getptr_ivengineclient();
 		match engine_ptr.is_not_null() {
 			true => { engine_ptr },
@@ -57,7 +49,7 @@ pub extern "C" fn rainstorm_init(_log_fd: libc::c_int) {
 				libc::exit(1);
 			}
 		}
-	};
+	});
 	log_print("Engine found.\n");
 	
 	let ibaseclientdll: * mut sdk::IBaseClientDLL = unsafe {

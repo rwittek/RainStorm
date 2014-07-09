@@ -2,30 +2,48 @@ pub use libc::c_char;
 use libc;
 use core;
 use core::result::{Result, Ok, Err};
+use core::option::{Option, None, Some};
 use core::collections::Collection;
 use core::raw::Repr;
 use core::mem::transmute;
-
+use core::ptr::RawPtr;
 // opaque phantom types
 pub enum IVEngineClient {}
 pub enum IBaseClientDLL {}
 pub enum ConVar {}
-pub enum ICVar {}
+pub enum ICvar {}
 pub enum AppSysFactory {}
 pub enum PhysicsFactory {}
 pub enum Globals {}
 
 impl IVEngineClient {
-	pub fn ClientCmd(&mut self, command: &'static str) -> Result<(), &'static str> {
+	pub fn client_cmd(&mut self, command: &'static str) -> Result<(), &'static str> {
 		let mut buf = [0u8, ..256];
 		if command.len() >= buf.len() {
 			return Err("Buffer overflow!");
 		}
 		unsafe { core::ptr::copy_nonoverlapping_memory(transmute::<*const u8, *mut u8>(buf.repr().data), transmute(command.repr().data), command.len()); };
-		buf[command.len() + 1] = 0;
+		buf[command.len()] = 0;
 		unsafe { ivengineclient_clientcmd(self, unsafe { core::mem::transmute(buf.repr().data )}) };
 		
 		Ok(())
+	}
+}
+
+impl ICvar {
+	pub fn find_var(&mut self, name: &str) -> Option<*mut ConVar> {
+		let mut buf = [0u8, ..256];
+		if name.len() >= buf.len() {
+			return None
+		} else {
+			unsafe { core::ptr::copy_nonoverlapping_memory(transmute::<*const u8, *mut u8>(buf.repr().data), transmute(name.repr().data), name.len()); }
+			buf[name.len()] = 0;
+			let raw_convar = unsafe { icvar_findvar(self as *mut ICvar, transmute(buf.repr().data)) };
+			match raw_convar.is_null() {
+				true => None,
+				false => Some(raw_convar)
+			}
+		}
 	}
 }
 #[link(name="wrapper", kind="static")]
@@ -34,9 +52,9 @@ extern {
 	fn ivengineclient_clientcmd(engine: & mut IVEngineClient, cmd_string: * const c_char);
 	
 	pub fn getptr_ibaseclientdll() -> * mut IBaseClientDLL; // MAYBE NULL
-	pub fn getptr_icvar(app_sys_factory: * mut AppSysFactory) -> * mut ICVar;
+	pub fn getptr_icvar(app_sys_factory: * mut AppSysFactory) -> * mut ICvar;
 	
-	pub fn icvar_findvar(icvar: * mut ICVar, name: * const char) -> * mut ConVar; // MAYBE NULL;
+	fn icvar_findvar(icvar: * mut ICvar, name: * const char) -> * mut ConVar; // MAYBE NULL;
 	pub fn convar_setvalue_int(cvar: * mut ConVar, value: libc::c_int);
 	pub fn convar_clearflags(cvar: * mut ConVar);
 	pub static mut REAL_INIT: *const ();
