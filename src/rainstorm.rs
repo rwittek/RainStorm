@@ -1,35 +1,36 @@
-#![no_std]
 #![feature(intrinsics, lang_items, globs)]
+#![no_std]
 
 extern crate libc;
 extern crate core;
 
 use core::prelude::*;
-use core::mem;
-use core::raw::Slice;
 
 mod sdk;
+mod win32;
 
 #[no_mangle]
-pub extern "C" fn rainstorm_entrypt() {
-	unsafe { libc::puts(transmute::<&'static str, Slice>("hi\0").data); };
+pub extern "C" fn rainstorm_init(log_fd: libc::c_int) {
+	loop{}
+	
+	rainstorm_setup();
 }
 
-
-extern "rust-intrinsic" {
-    fn transmute<T, U> (e: T) -> U;
+fn rainstorm_setup() {
+	
+	let engine_ref: &mut sdk::ffi::Engine = unsafe {
+		let engine_ptr = sdk::ffi::getptr_engine();
+		match engine_ptr.to_option() {
+			Some(engine_ref) => std::mem::transmute(engine_ref), // ewww
+			None => panic("no engine?")
+		}
+	};
+	println!("Engine is at: {}", engine_ref as *mut sdk::ffi::Engine);
 }
 
-struct Slice {
-    data: *const i8,
-    _len: uint,
+fn panic(msg: &str) {
+	loop {}
 }
 
 #[lang = "stack_exhausted"] extern fn stack_exhausted() {}
 #[lang = "eh_personality"] extern fn eh_personality() {}
-#[lang = "begin_unwind"]
-extern fn begin_unwind(args: &core::fmt::Arguments,
-                       file: &str,
-                       line: uint) -> ! {
-    unsafe { core::intrinsics::abort(); }
-}

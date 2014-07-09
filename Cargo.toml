@@ -8,7 +8,3 @@ build = ".\\buildwrapper.bat"
 [[lib]]
 name = "rainstorm"
 crate_type = ["dylib"]
-
-[dependencies.rust-windows]
-
-git = "https://github.com/klutzy/rust-windows.git"
