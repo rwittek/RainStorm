@@ -7,6 +7,7 @@ use core::collections::Collection;
 use core::raw::Repr;
 use core::mem::transmute;
 use core::ptr::RawPtr;
+use CString;
 // opaque phantom types
 pub enum IVEngineClient {}
 pub enum IBaseClientDLL {}
@@ -15,6 +16,37 @@ pub enum ICvar {}
 pub enum AppSysFactory {}
 pub enum PhysicsFactory {}
 pub enum Globals {}
+pub enum CInput {}
+
+pub struct QAngle {
+	pitch: f32,
+	yaw: f32,
+	roll: f32
+}
+
+pub struct CUserCmd {
+	vtable_ptr: *const i32,
+	pub command_number: i32,
+	pub tick_count: i32,
+	
+	pub viewangles: QAngle,  
+
+	pub forwardmove: f32,
+	pub sidemove: f32,
+	pub upmove: f32,     
+	pub buttons: i32,	
+	// Impulse command issued.
+	pub impulse: u8,   
+	pub weaponselect: i32,	
+	pub weaponsubtype: i32,
+
+	random_seed: i32,
+
+	pub mousedx: u16,
+	pub mousedy: u16,
+
+	pub hasbeenpredicted: bool
+}
 
 impl IVEngineClient {
 	pub fn client_cmd(&mut self, command: &'static str) -> Result<(), &'static str> {
@@ -27,6 +59,32 @@ impl IVEngineClient {
 		unsafe { ivengineclient_clientcmd(self, unsafe { core::mem::transmute(buf.repr().data )}) };
 		
 		Ok(())
+	}
+}
+
+pub enum ConVarValue {
+	Int(libc::c_int),
+	Str(CString)
+}
+
+impl ConVar {
+	pub unsafe fn setvalue_raw(&mut self, val: ConVarValue) {
+		match val {
+			Int(v) => convar_setvalue_raw_int(self as *mut ConVar, v),
+			Str(s) => convar_setvalue_str(self as *mut ConVar, s)
+		}
+	}
+	pub unsafe fn setvalue(&mut self, val: ConVarValue) {
+		match val {
+			Int(v) => convar_setvalue_raw_int(self as *mut ConVar, v),
+			Str(s) => convar_setvalue_str(self as *mut ConVar, s)
+		}
+	}
+	pub unsafe fn freeze(&mut self) {
+		convar_freeze(self as *mut ConVar)
+	}
+	pub unsafe fn clearflags(&mut self) {
+		convar_clearflags(self as *mut ConVar)
 	}
 }
 
@@ -46,7 +104,7 @@ impl ICvar {
 		}
 	}
 }
-#[link(name="wrapper", kind="static")]
+
 extern {
 	pub fn getptr_ivengineclient() -> * mut IVEngineClient; // MAYBE NULL
 	fn ivengineclient_clientcmd(engine: & mut IVEngineClient, cmd_string: * const c_char);
@@ -54,10 +112,17 @@ extern {
 	pub fn getptr_ibaseclientdll() -> * mut IBaseClientDLL; // MAYBE NULL
 	pub fn getptr_icvar(app_sys_factory: * mut AppSysFactory) -> * mut ICvar;
 	
+	pub fn getptr_cinput(client: *mut IBaseClientDLL) -> *mut CInput;
 	fn icvar_findvar(icvar: * mut ICvar, name: * const char) -> * mut ConVar; // MAYBE NULL;
-	pub fn convar_setvalue_int(cvar: * mut ConVar, value: libc::c_int);
+	pub fn convar_setvalue_raw_int(cvar: * mut ConVar, value: libc::c_int);
+	pub fn convar_setvalue_str(cvar: * mut ConVar, value: CString);
 	pub fn convar_clearflags(cvar: * mut ConVar);
+	pub fn convar_freeze(cvar: * mut ConVar);
+	
 	pub static mut REAL_INIT: *const ();
+	pub static mut REAL_CREATEMOVE: *const ();
+	
+	pub static mut CINPUT_PTR: *mut CInput;
 }
 
 pub mod vmthook {
