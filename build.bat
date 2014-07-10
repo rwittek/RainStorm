@@ -1,3 +1,7 @@
-g++ -lstdc++ -DGNUC -D_WIN32 -I sdk_2013/common -I sdk_2013/game/shared  -I sdk_2013/game/shared/sdk -I sdk_2013/game/server -I sdk_2013/game/client/sdk -I sdk_2013/game/client -I sdk_2013\public -I sdk_2013 -I sdk_2013\public\tier0 -I sdk_2013\public\tier1 -march=native -mwindows -c wrapper.cpp -o target\deps\wrapper.o
-ar -rcs target\deps\libwrapper.a target\deps\wrapper.o
-rustc --crate-type=dylib src/rainstorm.rs -L target/deps -C link-args="-mwindows -static"
+del target\deps\libwrapper.a
+del target\deps\wrapper.o
+cl /c /EHsc /I  public /I public\tier0 /I  public\tier1 /I  public\common /I  public\client /I  public\shared /I  public\shared\sdk /I  public\vstdlib /I  public\client\sdk /I  publlic\inputsystem /I  public\vgui_controls /I  public\vgui wrapper.cpp /Fotarget\deps\wrapper.o
+
+
+rustc --crate-type=staticlib -o target/deps/rainstorm.a src/rainstorm.rs -L target/deps -C link-args="-mwindows -static"
+link /dll /force:multiple /out:target\rainstorm.dll target\deps\wrapper.o target\deps\rainstorm.a public\ImportLibrarys\mathlib.lib libmingwex.a libmingw32.a libmsvcr110.a
