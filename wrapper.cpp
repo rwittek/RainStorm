@@ -476,16 +476,50 @@ JustAfew:
 }
 
 
-extern "C" void rainstorm_init(int log_fd);
+extern "C" CInput *CINPUT_PTR;
+IClientEntityList *ENTLISTPTR;
+extern "C" int ( __stdcall *REAL_INIT)( CreateInterfaceFn appSysFactory, CreateInterfaceFn physicsFactory, CGlobalVarsBase* pGlobals );
+extern "C" void (__stdcall *REAL_CREATEMOVE)( int sequence_number, float input_sample_frametime, bool active );
+extern "C" void rainstorm_preinithook( CreateInterfaceFn appSysFactory, CreateInterfaceFn physicsFactory, CGlobalVarsBase* pGlobals );
+extern "C" void rainstorm_postinithook();
+extern "C" void rainstorm_process_usercmd(CUserCmd *cmd);
+extern "C" IVEngineClient *rainstorm_getivengineclient();
+extern "C" void rainstorm_init(int log_fd, void * hooked_init_trampoline, void *hooked_createmove_trampoline);
+int __stdcall hooked_init_trampoline( CreateInterfaceFn appSysFactory, CreateInterfaceFn physicsFactory, CGlobalVarsBase* pGlobals ) {
+	if (REAL_INIT != NULL) {
+		rainstorm_preinithook(appSysFactory, physicsFactory, pGlobals);
+		int retval = (*REAL_INIT)(appSysFactory, physicsFactory, pGlobals);
+		rainstorm_postinithook();
+		return retval;
+	} else {
+		//MessageBox(NULL, "no init :(", NULL, NULL);
+		while (1) {;};
+	}
+}
+
+void __stdcall hooked_createmove_trampoline( int sequence_number, float input_sample_frametime, bool active )
+{
+	(*REAL_CREATEMOVE)( sequence_number, input_sample_frametime, active );
+	IVEngineClient *engine = rainstorm_getivengineclient();
+	if( engine->IsLevelMainMenuBackground( ) || engine->IsDrawingLoadingImage( ) || engine->IsInGame( ) == false )
+		return;
+	CUserCmd* pCommand = CINPUT_PTR->GetUserCmd( sequence_number );
+	rainstorm_process_usercmd(pCommand);
+	CVerifiedUserCmd *pSafeCommand = *reinterpret_cast<CVerifiedUserCmd**>((size_t)CINPUT_PTR + 0xC8) + (sequence_number%90);
+	pSafeCommand->m_cmd = *pCommand;
+	pSafeCommand->m_crc = pSafeCommand->m_cmd.GetChecksum();
+}
+
+
 
 DWORD WINAPI startup_thread( LPVOID lpArguments ) {
 	FILE *f = fopen("rainstorm_debug.txt", "w");
-	rainstorm_init(fileno(f));
+	rainstorm_init(fileno(f), (void*)&hooked_init_trampoline, (void*)&hooked_createmove_trampoline);
 	//exit(1);
 	return 0;
 }
 
-extern "C" __declspec(dllexport) BOOL APIENTRY DllMain( HINSTANCE hInstance, DWORD dwReasonOfCall, LPVOID lpReserved ) {
+extern "C" BOOL APIENTRY DllMain( HINSTANCE hInstance, DWORD dwReasonOfCall, LPVOID lpReserved ) {
 	if ( dwReasonOfCall == DLL_PROCESS_ATTACH ) {
 		CreateThread( NULL, 0, (LPTHREAD_START_ROUTINE)startup_thread, NULL, 0, NULL );
 	}
@@ -520,10 +554,10 @@ extern "C" IClientEntityList * getptr_icliententitylist () {
 }
 
 
-extern "C" void * getptr_ivengineclient() {
+extern "C" IVEngineClient * getptr_ivengineclient() {
 	HMODULE hmEngine = GetModuleHandleSafe( "engine.dll" );
 	CreateInterfaceFn EngineFactory = ( CreateInterfaceFn ) GetProcAddress( hmEngine, "CreateInterface" );
-	return EngineFactory( VENGINE_CLIENT_INTERFACE_VERSION, NULL );
+	return (IVEngineClient *)EngineFactory( VENGINE_CLIENT_INTERFACE_VERSION, NULL );
 }
 
 extern "C" IEngineTrace * getptr_ienginetrace() {
@@ -570,74 +604,3 @@ extern "C" void convar_freeze(ConVar *cvar) {
 extern "C" void ivengineclient_clientcmd(void *engine_ptr, const char *command) {
 	((IVEngineClient *) engine_ptr)->ClientCmd(command);
 }
-
-extern "C" void rainstorm_preinithook( CreateInterfaceFn appSysFactory, CreateInterfaceFn physicsFactory, CGlobalVarsBase* pGlobals );
-extern "C" void rainstorm_postinithook();
-extern "C" void rainstorm_process_usercmd(CUserCmd *cmd);
-extern "C" IVEngineClient *rainstorm_getivengineclient();
-int ( __stdcall *REAL_INIT)( CreateInterfaceFn appSysFactory, CreateInterfaceFn physicsFactory, CGlobalVarsBase* pGlobals ) = NULL;
-void (__stdcall *REAL_CREATEMOVE)( int sequence_number, float input_sample_frametime, bool active ) = NULL;
-
-CInput *CINPUT_PTR;
-IClientEntityList *ENTLISTPTR;
-int __stdcall hooked_init_trampoline( CreateInterfaceFn appSysFactory, CreateInterfaceFn physicsFactory, CGlobalVarsBase* pGlobals ) {
-	if (REAL_INIT) {
-		rainstorm_preinithook(appSysFactory, physicsFactory, pGlobals);
-		int retval = (*REAL_INIT)(appSysFactory, physicsFactory, pGlobals);
-		rainstorm_postinithook();
-		return retval;
-	} else {
-		//MessageBox(NULL, "no init :(", NULL, NULL);
-		exit(1);
-	}
-}
-
-void __stdcall hooked_createmove_trampoline( int sequence_number, float input_sample_frametime, bool active )
-{
-	(*REAL_CREATEMOVE)( sequence_number, input_sample_frametime, active );
-	IVEngineClient *engine = rainstorm_getivengineclient();
-	if( engine->IsLevelMainMenuBackground( ) || engine->IsDrawingLoadingImage( ) || engine->IsInGame( ) == false )
-		return;
-	CUserCmd* pCommand = CINPUT_PTR->GetUserCmd( sequence_number );
-	rainstorm_process_usercmd(pCommand);
-	CVerifiedUserCmd *pSafeCommand = *reinterpret_cast<CVerifiedUserCmd**>((size_t)CINPUT_PTR + 0xC8) + (sequence_number%90);
-	pSafeCommand->m_cmd = *pCommand;
-	pSafeCommand->m_crc = pSafeCommand->m_cmd.GetChecksum();
-}
-
-extern "C" bool bTraceToPlayer( void )
-{
-	trace_t pTrace;
-	Ray_t pRay;
-	player_info_t pInfo;
-
-	C_BaseEntity* pBaseEntity = static_cast<C_BaseEntity*>(getptr_icliententitylist()->GetClientEntity((rainstorm_getivengineclient()->GetLocalPlayer())));
-
-	if ( !pBaseEntity )
-		return false;
-
-	Vector vDirection;
-
-	AngleVectors( pBaseEntity->GetAbsAngles( ), &vDirection );
-
-	vDirection = vDirection * 8192 + pBaseEntity->EyePosition( );
-	Vector vLocalPosition = pBaseEntity->EyePosition( );
-
-	pRay.Init( vLocalPosition, vDirection );
-
-	getptr_ienginetrace()->TraceRay( pRay, ( CONTENTS_SOLID|CONTENTS_MOVEABLE|CONTENTS_MONSTER|CONTENTS_DEBRIS|CONTENTS_HITBOX ), NULL, &pTrace);
-
-	if ( pTrace.allsolid )
-		return false;
-
-	if ( pTrace.m_pEnt )
-	{
-		if ( rainstorm_getivengineclient()->GetPlayerInfo( pTrace.m_pEnt->index, &pInfo ) == false )
-			return false;
-
-		return pTrace.m_pEnt->m_iTeamNum != pBaseEntity->m_iTeamNum; // Avoid teammates.
-	}
-
-	return false;
-}
-

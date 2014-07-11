@@ -7,6 +7,7 @@ use core::collections::Collection;
 use core::raw::Repr;
 use core::mem::transmute;
 use core::ptr::RawPtr;
+
 use CString;
 // opaque phantom types
 pub enum IVEngineClient {}
@@ -60,6 +61,9 @@ impl IVEngineClient {
 		
 		Ok(())
 	}
+	pub fn time(&mut self) -> f32 {
+		ivengineclient_time()
+	}
 }
 
 pub enum ConVarValue {
@@ -104,10 +108,11 @@ impl ICvar {
 		}
 	}
 }
-
-extern {
+	
+extern "C" {
 	pub fn getptr_ivengineclient() -> * mut IVEngineClient; // MAYBE NULL
 	fn ivengineclient_clientcmd(engine: & mut IVEngineClient, cmd_string: * const c_char);
+	fn ivengineclient_time(engine: &mut IVEngineClient) -> libc::c_float;
 	
 	pub fn getptr_ibaseclientdll() -> * mut IBaseClientDLL; // MAYBE NULL
 	pub fn getptr_icvar(app_sys_factory: * mut AppSysFactory) -> * mut ICvar;
@@ -119,10 +124,7 @@ extern {
 	pub fn convar_clearflags(cvar: * mut ConVar);
 	pub fn convar_freeze(cvar: * mut ConVar);
 	
-	pub static mut REAL_INIT: *const ();
-	pub static mut REAL_CREATEMOVE: *const ();
-	
-	pub static mut CINPUT_PTR: *mut CInput;
+	pub fn trace_to_player(angles: &mut QAngle) -> bool;
 }
 
 pub mod vmthook {
@@ -130,6 +132,7 @@ pub mod vmthook {
 	use log_print;
 	use libc;
 	use core::option::{Some, None, Option};
+	use core::ptr::RawPtr;
 	
 	static VMT_MAX_SIZE_YOLO: u32 = 512; // swag
 	type VMT = [*const (), ..VMT_MAX_SIZE_YOLO];
@@ -146,7 +149,10 @@ pub mod vmthook {
 			// yes, we do leak this.
 			// yolo.
 			let new_vmt = libc::malloc(core::mem::size_of::<VMT>() as u32) as *mut VMT;
-			
+			log_print("Allocating new VMT\n");
+			if new_vmt.is_null() {
+				log_print("FAILED TO ALLOCATE VMT\n");
+			}
 			*new_vmt = *vmt_ptr; // christ this had better work
 			let hooker = VMTHooker {
 				original_vmt_ptr_ptr: core::mem::transmute(vmt_ptr_ptr),
@@ -154,7 +160,6 @@ pub mod vmthook {
 				patched_vmt_ptr: new_vmt
 			};
 			*vmt_ptr_ptr = (new_vmt) as *const VMT as *const ();
-			
 			hooker
 		}
 		
