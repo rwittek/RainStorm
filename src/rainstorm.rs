@@ -11,10 +11,10 @@ use logging::{log};
 mod sdk;
 
 
-static mut IVENGINECLIENT_PTR: Option<*mut sdk::IVEngineClient> = None;
-static mut IBASECLIENTDLL_PTR: Option<*mut sdk::IBaseClientDLL> = None;
-static mut APPSYSFACTORY_PTR: Option<*mut sdk::AppSysFactory> = None;
-static mut ICVAR_PTR: Option<*mut sdk::ICvar> = None;
+static mut IVENGINECLIENT_PTR: *mut sdk::IVEngineClient = 0;
+static mut IBASECLIENTDLL_PTR: *mut sdk::IBaseClientDLL = 0;
+static mut APPSYSFACTORY_PTR: *mut sdk::AppSysFactory = 0;
+static mut ICVAR_PTR: Option<*mut sdk::ICvar> = 0;
 #[no_mangle]
 pub static mut REAL_INIT: *const () = 0 as *const();
 #[no_mangle]
@@ -41,55 +41,56 @@ impl CString {
 
 
 pub unsafe fn locate_cinput() -> Option<*mut sdk::CInput> {
-	let start_addr: u32 = REAL_CREATEMOVE as u32;
-	let mut state = 0u8;
-	for offset in core::iter::range(start_addr, start_addr + 100) {
-		log_print("meow!");
-		let b1 = offset as *const u8;
-		let b2 = (offset + 1) as *const u8;
-		if (*b1 == 0x8Bu8) && (*b2 == 0x0Du8) {
-			return Some(**((offset + 2) as *mut *mut *mut sdk::CInput));
+	let start_addr = REAL_CREATEMOVE as *const ();
+	let result = utils::search_memory(startaddr, 100, &[0x8Bu8, 0x0D]);
+	
+	match Result {
+		Some(cinput_ptr) => { 
+			format_args!(log, "CInput found at {}\n", cinput_ptr);
+			cinput_ptr
+		},
+		None {
+			format_args!(log, "CInput not found?!?\n", cinput_ptr);
+			None
 		}
 	}
-	log_print(":(");
-	None
 }
 #[no_mangle]
 pub unsafe extern "C" fn rainstorm_preinithook(app_sys_factory: *mut sdk::AppSysFactory, physics_factory: *mut sdk::PhysicsFactory, globals: *mut sdk::Globals) {
-	log_print("Pre-init hook running...\n");
+	format_args!(log, "pre-inint hook running\n");
 	APPSYSFACTORY_PTR = Some(app_sys_factory);
 	ICVAR_PTR = Some(sdk::getptr_icvar(app_sys_factory));
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn rainstorm_postinithook() {
-	log_print("Post-init hook running...\n");
-	let sv_cheats = (*ICVAR_PTR.unwrap()).find_var("sv_cheats");
+	format_args!(log, "Post-init hook running...\n");
+	//let sv_cheats = (*ICVAR_PTR.unwrap()).find_var("sv_cheats");
 	//match sv_cheats {
 	//	Some(cheats) => { (*cheats).setvalue_raw(sdk::Int(1)); log_print("sv_cheats 1 OK\n") },
 	//	None => log_print("No sv_cheats?!"),
 	//};
-	let cvar_name = (*ICVAR_PTR.unwrap()).find_var("name");
-	match cvar_name {
-		Some(name) => {
-			log_print("found name\n");
+	//let cvar_name = (*ICVAR_PTR.unwrap()).find_var("name");
+	//match cvar_name {
+	//	Some(name) => {
+	//		log_print("found name\n");
 			//(*name).setvalue(sdk::Str(CString::new("lil' timmy\0").unwrap()));
 			//(*name).freeze();
 			//log_print("name changed\n");
-		}, 
-		None => log_print("no name?!\n")
-	}
-	let cvar_interp = (*ICVAR_PTR.unwrap()).find_var("cl_interp");
-	match cvar_interp {
-		Some(interp) => {
-			log_print("found interp\n");
-			//(*interp).clearflags();
-			//(*interp).setvalue(sdk::Str(CString::new("20").unwrap()));
-			//(*interp).freeze();
-			log_print("interp changed\n");
-		}, 
-		None => log_print("no interp?!\n")
-	}
+	//	}, 
+	//	None => log_print("no name?!\n")
+	//}
+	//let cvar_interp = (*ICVAR_PTR.unwrap()).find_var("cl_interp");
+	//match cvar_interp {
+	//	Some(interp) => {
+	//		log_print("found interp\n");
+	//		//(*interp).clearflags();
+	//		//(*interp).setvalue(sdk::Str(CString::new("20").unwrap()));
+	//		//(*interp).freeze();
+	//		log_print("interp changed\n");
+	//	}, 
+	//	None => log_print("no interp?!\n")
+	//}
 }
 static mut LAST_TTP: u32 = 0;
 #[no_mangle]
@@ -97,16 +98,11 @@ pub extern "C" fn rainstorm_process_usercmd(cmd: &mut sdk::CUserCmd) {
 	if  (cmd.buttons & 1 == 1) {
 		cmd.buttons = !((!cmd.buttons) | 1);
 		unsafe { if  sdk::trace_to_player(&cmd.viewangles) {
-			if (LAST_TTP >= 0) { cmd.buttons = cmd.buttons | 1; };
-			
-			LAST_TTP = LAST_TTP + 1;
-		} else {
-			LAST_TTP = LAST_TTP / 2;
+			cmd.buttons = cmd.buttons | 1;;
 		}};
 	}
 	if  false { // (cmd.buttons & (1 << 0)) == 0 && (cmd.forwardmove > 0.1f32 || cmd.forwardmove < -0.001f32) {
 		// speedhack time
-		//let time = unsafe { (*(IVENGINECLIENT_PTR.unwrap())) } .time();
 		let x = cmd.forwardmove;
 		cmd.forwardmove = -999f32;
 		//cmd.sidemove = 1.0f32 * x;
@@ -127,28 +123,26 @@ pub unsafe extern "C" fn rainstorm_getivengineclient() -> *mut sdk::IVEngineClie
 pub extern "C" fn rainstorm_init(_log_fd: libc::c_int, hooked_init_trampoline: *const (), hooked_createmove_trampoline: *const ()) {
 	let log_fd = _log_fd;
 	unsafe { LOG_FD = _log_fd; };
-	unsafe { IVENGINECLIENT_PTR = Some({
+	unsafe { IVENGINECLIENT_PTR = {
 		let engine_ptr = sdk::getptr_ivengineclient();
 		match engine_ptr.is_not_null() {
-			true => { engine_ptr },
-			false => { log_print("Engine not found, dying\n");
+			true => { format_args!(log, "Engine found at {}.\n", engine_ptr); engine_ptr },
+			false => { format_args!(log, "Engine not found, dying\n");
 				libc::exit(1);
 			}
 		}
-	})};
-	log_print("Engine found.\n");
+	}};
+	format_args!(log, "Engine found at {}.\n", IVENGINECLIENT_PTR);
 	
 	unsafe {IBASECLIENTDLL_PTR = Some({
 		let ibaseclientdll_ptr = sdk::getptr_ibaseclientdll();
 		match ibaseclientdll_ptr.is_not_null() {
-			true => { ibaseclientdll_ptr },
-			false => { log_print("IBaseClientDLL not found, dying\n");
+			true => { format_args!(log, "IBaseClientDLL found at {}\n", ibaseclientdll_ptr); ibaseclientdll_ptr },
+			false => { format_args!(log, "IBaseClientDLL not found, dying\n");
 				libc::exit(1);
 			}
 		}
 	})};
-	
-	log_print("IBaseClientDLL found.\n");
 	
 	unsafe {
 		let mut hooker = sdk::vmthook::VMTHooker::new(IBASECLIENTDLL_PTR.unwrap() as *mut *const ());
@@ -156,15 +150,11 @@ pub extern "C" fn rainstorm_init(_log_fd: libc::c_int, hooked_init_trampoline: *
 		REAL_CREATEMOVE = hooker.get_orig_method(21);
 		hooker.hook(0, hooked_init_trampoline);
 		hooker.hook(21, hooked_createmove_trampoline);
-		log_print("Init hook installed.\n");
+		format_args!(log, "Init hook installed.\n");
 		//engine.ClientCmd("say hello world");
 	};
 	
 	unsafe { CINPUT_PTR = locate_cinput().unwrap() };
-	
-	log_print("CInput found.\n");
-
-	log_print("Hook installed... let's see!");
 		
 }
 
