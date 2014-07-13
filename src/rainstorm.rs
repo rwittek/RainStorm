@@ -3,10 +3,14 @@
 
 extern crate libc;
 extern crate core;
+extern crate alloc;
+extern crate collections;
 
 pub use logging::log;
 pub use core::prelude::*;
 pub use core::result::{Result, Ok, Err};
+pub use cheats::Cheat;
+pub use alloc::owned::Box;
 use core::raw::Repr;
 
 
@@ -103,17 +107,16 @@ pub unsafe extern "C" fn rainstorm_postinithook() {
 
 #[no_mangle]
 pub extern "C" fn rainstorm_process_usercmd(cmd: &mut sdk::CUserCmd) {
-	// get all the active Cheats
-	// call their process_usercmd
-	// ???
-	// profit
-	if  (cmd.buttons & 1 == 1) {
-		cmd.buttons = !((!cmd.buttons) | 1);
-		unsafe { if  sdk::trace_to_player(&cmd.viewangles) {
-			cmd.buttons = cmd.buttons | 1;;
-		}};
+	unsafe {
+		if cheats::CHEAT_MANAGER.is_not_null() {
+			(*cheats::CHEAT_MANAGER).process_usercmd(cmd);
+		} else {
+			format_args!(log, "Cheat manager not found!\n");
+			libc::exit(1);
+		};
 	}
 }
+
 #[no_mangle]
 pub unsafe extern "C" fn rainstorm_getivengineclient() -> *mut sdk::IVEngineClient {
 	IVENGINECLIENT_PTR
@@ -121,7 +124,7 @@ pub unsafe extern "C" fn rainstorm_getivengineclient() -> *mut sdk::IVEngineClie
 #[no_mangle]
 pub extern "C" fn rainstorm_init(log_fd: libc::c_int, hooked_init_trampoline: *const (), hooked_createmove_trampoline: *const ()) {
 	unsafe { logging::set_fd(log_fd) };
-	
+
 	unsafe {
 		IVENGINECLIENT_PTR = {
 			let engine_ptr = sdk::getptr_ivengineclient();
@@ -156,6 +159,7 @@ pub extern "C" fn rainstorm_init(log_fd: libc::c_int, hooked_init_trampoline: *c
 	
 	unsafe { CINPUT_PTR = locate_cinput().unwrap() };
 		
+	cheats::cheatmgr_init();
 }
 
 #[lang = "stack_exhausted"] extern fn stack_exhausted() {}

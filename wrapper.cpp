@@ -601,7 +601,9 @@ extern "C" void convar_clearflags(ConVar *cvar) {
 	cvar->m_bHasMin = false;
 	cvar->m_bHasMax = false;
 }
-
+extern "C" void _Unwind_Resume() {
+	while (1) {;};
+}
 
 void convar_restore( IConVar* ivar, const char* pOldValue, float flOldValue ) {
 	ConVar *var = (ConVar *) ivar;
