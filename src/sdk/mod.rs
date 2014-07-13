@@ -20,9 +20,9 @@ pub enum Globals {}
 pub enum CInput {}
 
 pub struct QAngle {
-	pitch: f32,
-	yaw: f32,
-	roll: f32
+	pub pitch: f32,
+	pub yaw: f32,
+	pub roll: f32
 }
 
 pub struct CUserCmd {
@@ -62,7 +62,7 @@ impl IVEngineClient {
 		Ok(())
 	}
 	pub fn time(&mut self) -> f32 {
-		ivengineclient_time()
+		unsafe { ivengineclient_time(self) } 
 	}
 }
 
@@ -124,7 +124,7 @@ extern "C" {
 	pub fn convar_clearflags(cvar: * mut ConVar);
 	pub fn convar_freeze(cvar: * mut ConVar);
 	
-	pub fn trace_to_player(angles: &mut QAngle) -> bool;
+	pub fn trace_to_player(viewangles: &QAngle ) -> bool;
 }
 
 pub mod vmthook {

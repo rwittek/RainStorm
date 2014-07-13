@@ -38,3 +38,7 @@ Icon
 target/.rainstorm.fingerprint
 target/rainstorm.dll
 target/deps/*
+librainstorm.rlib
+rainstorm.metadata.o
+wrapper.exp
+rainstorm.bc

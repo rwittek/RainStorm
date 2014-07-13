@@ -41,7 +41,7 @@ pub fn log_print(msg: &str) {
 	unsafe { libc::write(LOG_FD, unsafe { core::mem::transmute(msg.repr().data) }, msg.repr().len as u32); };
 }
 
-
+#[no_mangle]
 static mut LOG_FD: libc::c_int = 0;
 
 pub unsafe fn locate_cinput() -> Option<*mut sdk::CInput> {
@@ -69,10 +69,10 @@ pub unsafe extern "C" fn rainstorm_preinithook(app_sys_factory: *mut sdk::AppSys
 pub unsafe extern "C" fn rainstorm_postinithook() {
 	log_print("Post-init hook running...\n");
 	let sv_cheats = (*ICVAR_PTR.unwrap()).find_var("sv_cheats");
-	match sv_cheats {
-		Some(cheats) => { (*cheats).setvalue_raw(sdk::Int(1)); log_print("sv_cheats 1 OK\n") },
-		None => log_print("No sv_cheats?!"),
-	};
+	//match sv_cheats {
+	//	Some(cheats) => { (*cheats).setvalue_raw(sdk::Int(1)); log_print("sv_cheats 1 OK\n") },
+	//	None => log_print("No sv_cheats?!"),
+	//};
 	let cvar_name = (*ICVAR_PTR.unwrap()).find_var("name");
 	match cvar_name {
 		Some(name) => {
@@ -95,11 +95,30 @@ pub unsafe extern "C" fn rainstorm_postinithook() {
 		None => log_print("no interp?!\n")
 	}
 }
+static mut LAST_TTP: u32 = 0;
 #[no_mangle]
 pub extern "C" fn rainstorm_process_usercmd(cmd: &mut sdk::CUserCmd) {
-	if !(cmd.buttons & 1) {
-		// not attacking, do random bs
-		let time = (*(IVENGINECLIENT_PTR.unwrap())).time();
+	if  (cmd.buttons & 1 == 1) {
+		cmd.buttons = !((!cmd.buttons) | 1);
+		unsafe { if  sdk::trace_to_player(&cmd.viewangles) {
+			if (LAST_TTP >= 0) { cmd.buttons = cmd.buttons | 1; };
+			
+			LAST_TTP = LAST_TTP + 1;
+		} else {
+			LAST_TTP = LAST_TTP / 2;
+		}};
+	}
+	if  false { // (cmd.buttons & (1 << 0)) == 0 && (cmd.forwardmove > 0.1f32 || cmd.forwardmove < -0.001f32) {
+		// speedhack time
+		//let time = unsafe { (*(IVENGINECLIENT_PTR.unwrap())) } .time();
+		let x = cmd.forwardmove;
+		cmd.forwardmove = -999f32;
+		//cmd.sidemove = 1.0f32 * x;
+		
+		cmd.viewangles.pitch = 89f32;
+		cmd.viewangles.yaw = ((cmd.viewangles.yaw + 180f32) % 360f32);
+		cmd.viewangles.roll= 49f32;
+	}
 }
 #[no_mangle]
 pub unsafe extern "C" fn rainstorm_getivengineclient() -> *mut sdk::IVEngineClient {

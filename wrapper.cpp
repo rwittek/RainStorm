@@ -90,7 +90,7 @@
 #include "public\shared\achievementmgr.h"
 #include "public\steam\steam_api.h"
 #include "public\IGameUIFuncs.h"
-
+#include "public\toolframework\IEngineTool.h"
 //===================================================================================
 // IBaseClientDLL interface from SDK
 //===================================================================================
@@ -476,6 +476,8 @@ JustAfew:
 }
 
 
+CreateInterfaceFn AppSysFactory;
+
 extern "C" CInput *CINPUT_PTR;
 IClientEntityList *ENTLISTPTR;
 extern "C" int ( __stdcall *REAL_INIT)( CreateInterfaceFn appSysFactory, CreateInterfaceFn physicsFactory, CGlobalVarsBase* pGlobals );
@@ -485,7 +487,9 @@ extern "C" void rainstorm_postinithook();
 extern "C" void rainstorm_process_usercmd(CUserCmd *cmd);
 extern "C" IVEngineClient *rainstorm_getivengineclient();
 extern "C" void rainstorm_init(int log_fd, void * hooked_init_trampoline, void *hooked_createmove_trampoline);
+extern "C" int LOG_FD;
 int __stdcall hooked_init_trampoline( CreateInterfaceFn appSysFactory, CreateInterfaceFn physicsFactory, CGlobalVarsBase* pGlobals ) {
+	AppSysFactory = appSysFactory;
 	if (REAL_INIT != NULL) {
 		rainstorm_preinithook(appSysFactory, physicsFactory, pGlobals);
 		int retval = (*REAL_INIT)(appSysFactory, physicsFactory, pGlobals);
@@ -512,9 +516,10 @@ void __stdcall hooked_createmove_trampoline( int sequence_number, float input_sa
 
 
 
+FILE *logfile;
 DWORD WINAPI startup_thread( LPVOID lpArguments ) {
-	FILE *f = fopen("rainstorm_debug.txt", "w");
-	rainstorm_init(fileno(f), (void*)&hooked_init_trampoline, (void*)&hooked_createmove_trampoline);
+	logfile = fopen("rainstorm_debug.txt", "w");
+	rainstorm_init(fileno(logfile), (void*)&hooked_init_trampoline, (void*)&hooked_createmove_trampoline);
 	//exit(1);
 	return 0;
 }
@@ -540,16 +545,24 @@ HMODULE GetModuleHandleSafe( const char* pszModuleName )
 	return hmModuleHandle;
 }
 
-
-extern "C" void * getptr_ibaseclientdll() {
+CreateInterfaceFn ClientFactory;
+CreateInterfaceFn EngineFactory;
+void setup_clientfactory() {
 	HMODULE hmClient = GetModuleHandleSafe( "client.dll" );
-	CreateInterfaceFn ClientFactory = ( CreateInterfaceFn ) GetProcAddress( hmClient, "CreateInterface" );
-	return ClientFactory ( CLIENT_DLL_INTERFACE_VERSION, NULL );
+	ClientFactory = ( CreateInterfaceFn ) GetProcAddress( hmClient, "CreateInterface" );
+}
+void setup_enginefactory() {
+	HMODULE hmClient = GetModuleHandleSafe( "engine.dll" );
+	ClientFactory = ( CreateInterfaceFn ) GetProcAddress( hmClient, "CreateInterface" );
+}
+extern "C" IBaseClientDLL * getptr_ibaseclientdll() {
+	HMODULE hmClient = GetModuleHandleSafe( "client.dll" );
+	if (ClientFactory == NULL) setup_clientfactory();
+	return (IBaseClientDLL *)ClientFactory ( CLIENT_DLL_INTERFACE_VERSION, NULL );
 }
 
 extern "C" IClientEntityList * getptr_icliententitylist () {
-	HMODULE hmClient = GetModuleHandleSafe( "client.dll" );
-	CreateInterfaceFn ClientFactory = ( CreateInterfaceFn ) GetProcAddress( hmClient, "CreateInterface" );
+	if (ClientFactory == NULL) setup_clientfactory();
 	return (IClientEntityList*) ClientFactory ( VCLIENTENTITYLIST_INTERFACE_VERSION, NULL );
 }
 
@@ -566,10 +579,12 @@ extern "C" IEngineTrace * getptr_ienginetrace() {
 	return ( IEngineTrace* ) EngineFactory( INTERFACEVERSION_ENGINETRACE_CLIENT, NULL );
 }
 
-extern "C" void * getptr_icvar(CreateInterfaceFn AppSysFactory) {
+extern "C" void * getptr_icvar(CreateInterfaceFn unused) {
 	return AppSysFactory( CVAR_INTERFACE_VERSION, NULL );
 }
-
+extern "C" IEngineTool * getptr_ienginetool() {
+	return (IEngineTool *) AppSysFactory( VENGINETOOL_INTERFACE_VERSION, NULL );
+}
 extern "C" void * icvar_findvar(ICvar *icvar, const char *name) {
 	return icvar->FindVar(name);
 }
@@ -601,6 +616,94 @@ extern "C" void convar_freeze(ConVar *cvar) {
 }
 
 
-extern "C" void ivengineclient_clientcmd(void *engine_ptr, const char *command) {
-	((IVEngineClient *) engine_ptr)->ClientCmd(command);
+extern "C" void ivengineclient_clientcmd(IVEngineClient *engine_ptr, const char *command) {
+	engine_ptr->ClientCmd(command);
 }
+
+extern "C" float ivengineclient_time(IVEngineClient *engine_ptr)  {
+	return engine_ptr->Time();
+}
+
+class TriggerbotTraceFilter : public ITraceFilter
+{
+	public:
+		bool hit_player;
+	//TriggerbotTraceFilter();
+    virtual bool ShouldHitEntity( IHandleEntity *pEntity, int contentsMask );
+    virtual TraceType_t  GetTraceType() const;
+};
+bool TriggerbotTraceFilter::ShouldHitEntity( IHandleEntity* pHandle, int contentsMask )
+{
+    CBaseEntity* pEnt = static_cast<CBaseEntity*>( pHandle );
+
+    // Huge Credits: Casual_Hacker, I had copied all the code he provided.
+    ClientClass* pEntCC = pEnt->GetClientClass();
+    const char* ccName = pEntCC->GetName();
+	fprintf(logfile, "%s\n", ccName);
+	if (strcmp(ccName, "CTFPlayer") == 0) {
+		hit_player = true;
+		return true;
+	}
+    if ( strcmp(ccName, "CFuncRespawnRoomVisualizer") || strcmp(ccName, "CTFMedigunShield") ||
+        strcmp(ccName,"CFuncAreaPortalWindow"))
+    {
+        return false;
+    }
+
+    if ( pEnt == dynamic_cast<C_BaseEntity*>(getptr_icliententitylist()->GetClientEntity(rainstorm_getivengineclient()->GetLocalPlayer( ) )) )
+    {
+        return false;
+    }
+
+    return true;
+}
+TraceType_t TriggerbotTraceFilter::GetTraceType() const
+{
+    return TRACE_EVERYTHING;
+}
+
+extern "C" bool trace_to_player( QAngle &viewangles )
+{
+    trace_t pTrace;
+    Ray_t pRay;
+    player_info_t pInfo;
+	TriggerbotTraceFilter filter;
+	filter.hit_player = false;
+
+    IClientEntity* pBaseEntity = (getptr_icliententitylist()->GetClientEntity((rainstorm_getivengineclient()->GetLocalPlayer())));;
+
+    if ( !pBaseEntity )
+        return false;
+
+    Vector vDirection;
+
+    AngleVectors( viewangles, &vDirection );
+	Vector eyes = pBaseEntity->GetAbsOrigin();
+	eyes.x += *(float *)(((char *)pBaseEntity)+0x00F8+0);
+	eyes.y += *(float *)(((char *)pBaseEntity)+0x00F8+4);
+	eyes.z += *(float *)(((char *)pBaseEntity)+0x00F8+8);
+    vDirection = vDirection * 8192 + eyes;
+	
+    pRay.Init( eyes, vDirection );
+
+    getptr_ienginetrace()->TraceRay(pRay, ( CONTENTS_SOLID|CONTENTS_MOVEABLE|CONTENTS_MONSTER|CONTENTS_DEBRIS|CONTENTS_HITBOX ), &filter, &pTrace);
+	if ( pTrace.allsolid )
+        return false;
+
+    if ( pTrace.m_pEnt )
+    {
+        int entidx = pTrace.m_pEnt->index;	
+		fprintf(logfile, "%d\n", entidx);
+		fprintf(logfile, "%d\n", pTrace.hitgroup);
+		if (filter.hit_player && pTrace.hitgroup == HITGROUP_HEAD && ((*(int *)((((char *)pTrace.m_pEnt)+0x00AC)) != (*(int *)((((char *)pBaseEntity)+0x00AC)))))) {
+			return true;
+		}
+		if ( getptr_ivengineclient()->GetPlayerInfo( pTrace.m_pEnt->index, &pInfo ) == false )
+            return false;
+
+		//return true;
+        return false; //pTrace.m_pEnt->m_iTeamNum != pBaseEntity->m_iTeamNum; // Avoid teammates.
+    }
+
+    return false;
+}  
