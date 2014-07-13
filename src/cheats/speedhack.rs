@@ -3,9 +3,6 @@ use Cheat;
 pub struct Speedhack;
 
 impl Cheat for Speedhack {
-	fn new() -> Speedhack {
-		Speedhack
-	}
 	fn get_name<'a>(&'a self) -> &'a str {
 		"Speedhack"
 	}
