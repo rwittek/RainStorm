@@ -1,7 +1,7 @@
 #![feature(intrinsics, lang_items, globs)]
 #![no_std]
 
-pub extern crate libc;
+extern crate libc;
 extern crate core;
 
 pub use logging::log;
@@ -19,10 +19,10 @@ mod std {
 	pub use core::fmt; //lol
 }
 
-static mut IVENGINECLIENT_PTR: *mut sdk::IVEngineClient = 0;
-static mut IBASECLIENTDLL_PTR: *mut sdk::IBaseClientDLL = 0;
-static mut APPSYSFACTORY_PTR: *mut sdk::AppSysFactory = 0;
-static mut ICVAR_PTR: Option<*mut sdk::ICvar> = 0;
+static mut IVENGINECLIENT_PTR: *mut sdk::IVEngineClient = 0 as *mut sdk::IVEngineClient;
+static mut IBASECLIENTDLL_PTR: *mut sdk::IBaseClientDLL = 0 as *mut sdk::IBaseClientDLL;
+static mut APPSYSFACTORY_PTR: *mut sdk::AppSysFactory = 0 as *mut sdk::AppSysFactory;
+static mut ICVAR_PTR: *mut sdk::ICvar = 0 as *mut sdk::ICvar;
 #[no_mangle]
 pub static mut REAL_INIT: *const () = 0 as *const();
 #[no_mangle]
@@ -51,7 +51,7 @@ pub unsafe fn locate_cinput() -> Option<*mut sdk::CInput> {
 	match result {
 		Some(cinput_ptr) => { 
 			format_args!(log, "CInput found at {}\n", cinput_ptr);
-			Some(cinput_ptr)
+			Some(cinput_ptr as *mut sdk::CInput)
 		},
 		None => {
 			format_args!(log, "CInput not found?!?\n");
@@ -61,9 +61,10 @@ pub unsafe fn locate_cinput() -> Option<*mut sdk::CInput> {
 }
 #[no_mangle]
 pub unsafe extern "C" fn rainstorm_preinithook(app_sys_factory: *mut sdk::AppSysFactory, physics_factory: *mut sdk::PhysicsFactory, globals: *mut sdk::Globals) {
-	format_args!(log, "pre-inint hook running\n");
-	APPSYSFACTORY_PTR = Some(app_sys_factory);
-	ICVAR_PTR = Some(sdk::getptr_icvar(app_sys_factory));
+	format_args!(log, "pre-init hook running\n");
+	// TODO: null check
+	APPSYSFACTORY_PTR = app_sys_factory;
+	ICVAR_PTR = sdk::getptr_icvar(app_sys_factory);
 }
 
 #[no_mangle]
@@ -118,24 +119,23 @@ pub extern "C" fn rainstorm_process_usercmd(cmd: &mut sdk::CUserCmd) {
 }
 #[no_mangle]
 pub unsafe extern "C" fn rainstorm_getivengineclient() -> *mut sdk::IVEngineClient {
-	match IVENGINECLIENT_PTR {
-		Some(p) => p,
-		None => core::ptr::mut_null()
-	}
+	IVENGINECLIENT_PTR
 }
 #[no_mangle]
 pub extern "C" fn rainstorm_init(log_fd: libc::c_int, hooked_init_trampoline: *const (), hooked_createmove_trampoline: *const ()) {
 	unsafe { logging::set_fd(log_fd) };
-	unsafe { IVENGINECLIENT_PTR = {
-		let engine_ptr = sdk::getptr_ivengineclient();
-		match engine_ptr.is_not_null() {
-			true => { format_args!(log, "Engine found at {}.\n", engine_ptr); engine_ptr },
-			false => { format_args!(log, "Engine not found, dying\n");
-				libc::exit(1);
+	
+	unsafe {
+		IVENGINECLIENT_PTR = {
+			let engine_ptr = sdk::getptr_ivengineclient();
+			match engine_ptr.is_not_null() {
+				true => { format_args!(log, "Engine found at {}.\n", engine_ptr); engine_ptr },
+				false => { format_args!(log, "Engine not found, dying\n");
+					libc::exit(1);
+				}
 			}
 		}
-	}};
-	format_args!(log, "Engine found at {}.\n", IVENGINECLIENT_PTR);
+	};
 	
 	unsafe {IBASECLIENTDLL_PTR = {
 		let ibaseclientdll_ptr = sdk::getptr_ibaseclientdll();
@@ -153,7 +153,7 @@ pub extern "C" fn rainstorm_init(log_fd: libc::c_int, hooked_init_trampoline: *c
 		REAL_CREATEMOVE = hooker.get_orig_method(21);
 		hooker.hook(0, hooked_init_trampoline);
 		hooker.hook(21, hooked_createmove_trampoline);
-		format_args!(log, "Init hook installed.\n");
+		format_args!(log, "Hooks installed.\n");
 		//engine.ClientCmd("say hello world");
 	};
 	
@@ -164,7 +164,8 @@ pub extern "C" fn rainstorm_init(log_fd: libc::c_int, hooked_init_trampoline: *c
 #[lang = "stack_exhausted"] extern fn stack_exhausted() {}
 #[lang = "eh_personality"] extern fn eh_personality() {}
 #[lang = "begin_unwind"] extern fn begin_unwind(fmt: &core::fmt::Arguments, file: &str, line: uint) -> ! {
-	loop {}
+	log(fmt);
+	unsafe { libc::exit(1); }
 }
 
 #[no_mangle]
