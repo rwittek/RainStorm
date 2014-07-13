@@ -11,9 +11,10 @@ use core::raw::Repr;
 
 
 mod sdk;
-pub mod logging;
+mod logging;
 mod vmthook;
 mod utils;
+mod cheats;
 
 mod std {
 	pub use core::fmt; //lol
@@ -105,16 +106,6 @@ pub extern "C" fn rainstorm_process_usercmd(cmd: &mut sdk::CUserCmd) {
 		unsafe { if  sdk::trace_to_player(&cmd.viewangles) {
 			cmd.buttons = cmd.buttons | 1;;
 		}};
-	}
-	if  false { // (cmd.buttons & (1 << 0)) == 0 && (cmd.forwardmove > 0.1f32 || cmd.forwardmove < -0.001f32) {
-		// speedhack time
-		let x = cmd.forwardmove;
-		cmd.forwardmove = -999f32;
-		//cmd.sidemove = 1.0f32 * x;
-		
-		cmd.viewangles.pitch = 89f32;
-		cmd.viewangles.yaw = ((cmd.viewangles.yaw + 180f32) % 360f32);
-		cmd.viewangles.roll= 49f32;
 	}
 }
 #[no_mangle]
