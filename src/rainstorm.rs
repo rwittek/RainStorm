@@ -1,15 +1,23 @@
 #![feature(intrinsics, lang_items, globs)]
 #![no_std]
 
-extern crate libc;
+pub extern crate libc;
 extern crate core;
 
-use core::prelude::*;
+pub use logging::log;
+pub use core::prelude::*;
+pub use core::result::{Result, Ok, Err};
 use core::raw::Repr;
-use logging::{log};
+
 
 mod sdk;
+pub mod logging;
+mod vmthook;
+mod utils;
 
+mod std {
+	pub use core::fmt; //lol
+}
 
 static mut IVENGINECLIENT_PTR: *mut sdk::IVEngineClient = 0;
 static mut IBASECLIENTDLL_PTR: *mut sdk::IBaseClientDLL = 0;
@@ -21,10 +29,6 @@ pub static mut REAL_INIT: *const () = 0 as *const();
 pub static mut REAL_CREATEMOVE: *const () = 0 as *const ();
 #[no_mangle]
 pub static mut CINPUT_PTR: *mut sdk::CInput = 0 as *mut sdk::CInput;
-#[no_mangle]
-extern "stdcall" {
-	fn Sleep(time: u32);
-}
 
 struct CString(*const libc::c_char);
 
@@ -42,15 +46,15 @@ impl CString {
 
 pub unsafe fn locate_cinput() -> Option<*mut sdk::CInput> {
 	let start_addr = REAL_CREATEMOVE as *const ();
-	let result = utils::search_memory(startaddr, 100, &[0x8Bu8, 0x0D]);
+	let result = utils::search_memory(start_addr, 100, &[0x8Bu8, 0x0D]);
 	
-	match Result {
+	match result {
 		Some(cinput_ptr) => { 
 			format_args!(log, "CInput found at {}\n", cinput_ptr);
-			cinput_ptr
+			Some(cinput_ptr)
 		},
-		None {
-			format_args!(log, "CInput not found?!?\n", cinput_ptr);
+		None => {
+			format_args!(log, "CInput not found?!?\n");
 			None
 		}
 	}
@@ -120,9 +124,8 @@ pub unsafe extern "C" fn rainstorm_getivengineclient() -> *mut sdk::IVEngineClie
 	}
 }
 #[no_mangle]
-pub extern "C" fn rainstorm_init(_log_fd: libc::c_int, hooked_init_trampoline: *const (), hooked_createmove_trampoline: *const ()) {
-	let log_fd = _log_fd;
-	unsafe { LOG_FD = _log_fd; };
+pub extern "C" fn rainstorm_init(log_fd: libc::c_int, hooked_init_trampoline: *const (), hooked_createmove_trampoline: *const ()) {
+	unsafe { logging::set_fd(log_fd) };
 	unsafe { IVENGINECLIENT_PTR = {
 		let engine_ptr = sdk::getptr_ivengineclient();
 		match engine_ptr.is_not_null() {
@@ -134,7 +137,7 @@ pub extern "C" fn rainstorm_init(_log_fd: libc::c_int, hooked_init_trampoline: *
 	}};
 	format_args!(log, "Engine found at {}.\n", IVENGINECLIENT_PTR);
 	
-	unsafe {IBASECLIENTDLL_PTR = Some({
+	unsafe {IBASECLIENTDLL_PTR = {
 		let ibaseclientdll_ptr = sdk::getptr_ibaseclientdll();
 		match ibaseclientdll_ptr.is_not_null() {
 			true => { format_args!(log, "IBaseClientDLL found at {}\n", ibaseclientdll_ptr); ibaseclientdll_ptr },
@@ -142,10 +145,10 @@ pub extern "C" fn rainstorm_init(_log_fd: libc::c_int, hooked_init_trampoline: *
 				libc::exit(1);
 			}
 		}
-	})};
+	}};
 	
 	unsafe {
-		let mut hooker = sdk::vmthook::VMTHooker::new(IBASECLIENTDLL_PTR.unwrap() as *mut *const ());
+		let mut hooker = vmthook::VMTHooker::new(IBASECLIENTDLL_PTR as *mut *const ());
 		REAL_INIT = hooker.get_orig_method(0);
 		REAL_CREATEMOVE = hooker.get_orig_method(21);
 		hooker.hook(0, hooked_init_trampoline);

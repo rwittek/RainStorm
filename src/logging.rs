@@ -1,11 +1,11 @@
-use libc;
+use core::prelude::*;
 use core;
+use libc;
 
-#[no_mangle]
-static mut LOGGER: Option<RainstormLogger> = None;
+static mut LOGGER: Option<Logger> = None;
 
 struct Logger {
-	fd: libc::c_int;
+	fd: libc::c_int
 }
 
 impl Logger {
@@ -17,7 +17,7 @@ impl Logger {
 impl core::fmt::FormatWriter for Logger {
 	fn write(&mut self, bytes: &[u8]) -> core::fmt::Result {
 		let repr = bytes.repr();
-		let written_len = unsafe { libc::write(LOG_FD, core::mem::transmute(repr.data), repr.len as u32) };
+		let written_len = unsafe { libc::write(self.fd, core::mem::transmute(repr.data), repr.len as u32) };
 		
 		match written_len == repr.len {
 			// did we write all the data?
