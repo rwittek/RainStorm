@@ -42,3 +42,5 @@ librainstorm.rlib
 rainstorm.metadata.o
 wrapper.exp
 rainstorm.bc
+*.o
+target/rainstorm.exp
