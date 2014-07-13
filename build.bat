@@ -1,5 +1,7 @@
 del target\deps\libwrapper.a
 del target\deps\wrapper.o
+del target\deps\rainstorm.a
+
 cl /MT /c /EHsc /I  public /I public\tier0 /I  public\tier1 /I  public\common /I  public\client /I  public\shared /I  public\shared\sdk /I  public\vstdlib /I  public\client\sdk /I  publlic\inputsystem /I  public\vgui_controls /I  public\vgui wrapper.cpp /Fotarget\deps\wrapper.o
 
 

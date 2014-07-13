@@ -6,6 +6,8 @@ extern crate core;
 
 use core::prelude::*;
 use core::raw::Repr;
+use logging::{log};
+
 mod sdk;
 
 
@@ -37,12 +39,6 @@ impl CString {
 	}
 }
 
-pub fn log_print(msg: &str) {
-	unsafe { libc::write(LOG_FD, unsafe { core::mem::transmute(msg.repr().data) }, msg.repr().len as u32); };
-}
-
-#[no_mangle]
-static mut LOG_FD: libc::c_int = 0;
 
 pub unsafe fn locate_cinput() -> Option<*mut sdk::CInput> {
 	let start_addr: u32 = REAL_CREATEMOVE as u32;
@@ -170,10 +166,6 @@ pub extern "C" fn rainstorm_init(_log_fd: libc::c_int, hooked_init_trampoline: *
 
 	log_print("Hook installed... let's see!");
 		
-}
-
-fn panic(msg: &str) -> ! {
-	loop {}
 }
 
 #[lang = "stack_exhausted"] extern fn stack_exhausted() {}
