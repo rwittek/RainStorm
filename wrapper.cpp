@@ -475,6 +475,7 @@ JustAfew:
     goto JustAfew;
 }
 
+FILE *logfile;
 
 CreateInterfaceFn AppSysFactory;
 
@@ -516,7 +517,7 @@ void __stdcall hooked_createmove_trampoline( int sequence_number, float input_sa
 
 
 
-FILE *logfile;
+
 DWORD WINAPI startup_thread( LPVOID lpArguments ) {
 	logfile = fopen("rainstorm_debug.txt", "w");
 	rainstorm_init(fileno(logfile), (void*)&hooked_init_trampoline, (void*)&hooked_createmove_trampoline);

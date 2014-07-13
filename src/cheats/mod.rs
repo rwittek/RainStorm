@@ -1,4 +1,6 @@
+use sdk;
+
 pub trait Cheat {
-	pub fn get_name<'a>(&'a self) -> &'a str;
-	pub fn process_usercmd(&mut self, &mut sdk::CUserCmd);
+	fn get_name<'a>(&'a self) -> &'a str;
+	fn process_usercmd(&mut self, &mut sdk::CUserCmd);
 }

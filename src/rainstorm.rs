@@ -50,9 +50,11 @@ pub unsafe fn locate_cinput() -> Option<*mut sdk::CInput> {
 	let result = utils::search_memory(start_addr, 100, &[0x8Bu8, 0x0D]);
 	
 	match result {
-		Some(cinput_ptr) => { 
-			format_args!(log, "CInput found at {}\n", cinput_ptr);
-			Some(cinput_ptr as *mut sdk::CInput)
+		Some(ptr) => {
+			let cinput_ptr_ptr = *(((ptr as uint) + 2) as *const *const *mut sdk::CInput);
+			format_args!(log, "CInput pointer found at {}\n", cinput_ptr_ptr);
+			format_args!(log, "CInput found at {}\n", *cinput_ptr_ptr);
+			Some(*(cinput_ptr_ptr))
 		},
 		None => {
 			format_args!(log, "CInput not found?!?\n");
@@ -98,9 +100,13 @@ pub unsafe extern "C" fn rainstorm_postinithook() {
 	//	None => log_print("no interp?!\n")
 	//}
 }
-static mut LAST_TTP: u32 = 0;
+
 #[no_mangle]
 pub extern "C" fn rainstorm_process_usercmd(cmd: &mut sdk::CUserCmd) {
+	// get all the active Cheats
+	// call their process_usercmd
+	// ???
+	// profit
 	if  (cmd.buttons & 1 == 1) {
 		cmd.buttons = !((!cmd.buttons) | 1);
 		unsafe { if  sdk::trace_to_player(&cmd.viewangles) {
@@ -155,8 +161,9 @@ pub extern "C" fn rainstorm_init(log_fd: libc::c_int, hooked_init_trampoline: *c
 #[lang = "stack_exhausted"] extern fn stack_exhausted() {}
 #[lang = "eh_personality"] extern fn eh_personality() {}
 #[lang = "begin_unwind"] extern fn begin_unwind(fmt: &core::fmt::Arguments, file: &str, line: uint) -> ! {
+	format_args!(log, "Failed!");
 	log(fmt);
-	unsafe { libc::exit(1); }
+	unsafe { libc::exit(42); }
 }
 
 #[no_mangle]
