@@ -16,7 +16,7 @@ impl Cheat for Triggerbot {
 		if cmd.buttons & 1 == 1 {
 			cmd.buttons = !((!cmd.buttons) | 1); // zero the IN_ATTACK bit
 			unsafe {
-				if self.should_shoot() {
+				if self.should_shoot(cmd.viewangles) {
 						cmd.buttons = cmd.buttons | 1;
 				}
 			}
@@ -25,29 +25,33 @@ impl Cheat for Triggerbot {
 }
 
 impl Triggerbot {
-	fn should_shoot(&self) -> bool {
-		trace_t pTrace;
-		Ray_t pRay;
-		player_info_t pInfo;
-		sdk::TraceFilter filter = new sdk::TraceFilter(should_hit_entity);
+	fn should_shoot(&self, viewangles: &sdk::QAngle) -> bool {
+		sdk::trace_t pTrace;
+		sdk::Ray_t pRay;
+		let filter = sdk::create_tracefilter_from_predicate(should_hit_entity);
 
 		IClientEntity* pBaseEntity = (getptr_icliententitylist()->GetClientEntity((rainstorm_getivengineclient()->GetLocalPlayer())));;
 
-		if ( !pBaseEntity )
-			return false;
+		let me: match pBaseEntity.to_option() {
+			Some(ent) -> ent,
+			None -> { log!("IClientEntity of local player (id: {}) not found!\n", IVENGINECLIENT_PTR->GetLocalPlayer()); libc::exit(1); }
+		}
 
-		Vector vDirection;
+		sdk::Vector vDirection;
 
 		sdk::angle_vectors(viewangles, &vDirection );
-		Vector eyes = pBaseEntity->GetAbsOrigin();
-		eyes.x += *(float *)(((char *)pBaseEntity)+0x00F8+0);
-		eyes.y += *(float *)(((char *)pBaseEntity)+0x00F8+4);
-		eyes.z += *(float *)(((char *)pBaseEntity)+0x00F8+8);
+		sdk::Vector eyes = me.get_origin();
+		
+		let eye_offset_ptr = ((me as *mut IClientEntity as uint) + 0xF8) as *const [float, ..3];
+		eyes.x += eye_offsets[0];
+		eyes.y += eye_offsets[1];
+		eyes.z += eye_offsets[2];
+	
 		vDirection = vDirection * 8192 + eyes;
 		
 		pRay.Init( eyes, vDirection );
 
-		getptr_ienginetrace()->TraceRay(pRay, ( CONTENTS_SOLID|CONTENTS_MOVEABLE|CONTENTS_MONSTER|CONTENTS_DEBRIS|CONTENTS_HITBOX ), &filter, &pTrace);
+		getptr_ienginetrace()->TraceRay(pRay, ( CONTENTS_SOLID|CONTENTS_MOVEABLE|CONTENTS_MONSTER|CONTENTS_DEBRIS|CONTENTS_HITBOX ), filter.itracefilter, &pTrace);
 		if ( pTrace.allsolid )
 			return false;
 
