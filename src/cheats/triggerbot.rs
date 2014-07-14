@@ -57,11 +57,11 @@ impl Triggerbot {
 			eyes.y += (*eye_offsets)[1];
 			eyes.z += (*eye_offsets)[2];
 		}
-		direction = direction.scale( 8192f32 ) + eyes;
+		direction = direction.scale( 8192.0f32 ) + eyes;
 		
 		let ray = sdk::Ray_t::new(&eyes, &direction);
 
-		unsafe { ::IENGINETRACE_PTR.to_option().unwrap().trace_ray(&ray, 0x200400B, None, &mut trace); }
+		unsafe { ::IENGINETRACE_PTR.to_option().unwrap().trace_ray(&ray, 0x46004001, None, &mut trace); }
 		if ( trace.base.allsolid ) {
 			return false;
 		}
@@ -69,8 +69,12 @@ impl Triggerbot {
 		if ( trace.ent.is_not_null() )
 		{
 			let entidx = unsafe { trace.ent.to_option().unwrap().get_index() };	
-			log!("Hit entity {} at hitgroup {}", entidx, trace.hitgroup);
-			if (trace.hitgroup ==  1) { //&& ((*(int *)((((char *)pTrace.m_pEnt)+0x00AC)) != (*(int *)((((char *)pBaseEntity)+0x00AC)))))) {
+			//log!("Hit entity {} at hitgroup {}\n", entidx, unsafe { sdk::trace_t_gethitgroup(&trace)});
+			if (trace.hitgroup ==  1) && 
+					unsafe {
+						((*(((trace.ent as uint)+0x00AC) as *const i32)) != (*(((me as *mut sdk::C_BaseEntity as uint)+0x00AC) as *const i32)))
+					}
+			{
 				return true;
 			}
 			return false; //pTrace.m_pEnt->m_iTeamNum != pBaseEntity->m_iTeamNum; // Avoid teammates.

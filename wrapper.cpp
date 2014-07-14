@@ -604,6 +604,9 @@ extern "C" void convar_clearflags(ConVar *cvar) {
 extern "C" void _Unwind_Resume() {
 	while (1) {;};
 }
+extern "C" int trace_t_gethitgroup(CGameTrace *tr) {
+	return tr->hitgroup;
+}
 
 void convar_restore( IConVar* ivar, const char* pOldValue, float flOldValue ) {
 	ConVar *var = (ConVar *) ivar;
@@ -635,88 +638,20 @@ extern "C" ClientClass *ibaseclientdll_getallclasses(IBaseClientDLL *client) {
 extern "C" void angle_vectors(QAngle &angle, Vector *vec1, Vector *vec2, Vector *vec3) {
 	AngleVectors(angle, vec1, vec2, vec3);
 }
-class TriggerbotTraceFilter : public ITraceFilter
-{
-	public:
-		bool hit_player;
-	//TriggerbotTraceFilter();
-    virtual bool ShouldHitEntity( IHandleEntity *pEntity, int contentsMask );
-    virtual TraceType_t  GetTraceType() const;
-};
-bool TriggerbotTraceFilter::ShouldHitEntity( IHandleEntity* pHandle, int contentsMask )
-{
-    CBaseEntity* pEnt = static_cast<CBaseEntity*>( pHandle );
-
-    // Huge Credits: Casual_Hacker, I had copied all the code he provided.
-    ClientClass* pEntCC = pEnt->GetClientClass();
-    const char* ccName = pEntCC->GetName();
-	fprintf(logfile, "%s\n", ccName);
-	if (strcmp(ccName, "CTFPlayer") == 0) {
-		hit_player = true;
-		return true;
-	}
-    if ( strcmp(ccName, "CFuncRespawnRoomVisualizer") || strcmp(ccName, "CTFMedigunShield") ||
-        strcmp(ccName,"CFuncAreaPortalWindow"))
-    {
-        return false;
-    }
-
-    if ( pEnt == dynamic_cast<C_BaseEntity*>(getptr_icliententitylist()->GetClientEntity(rainstorm_getivengineclient()->GetLocalPlayer( ) )) )
-    {
-        return false;
-    }
-
-    return true;
-}
-TraceType_t TriggerbotTraceFilter::GetTraceType() const
-{
-    return TRACE_EVERYTHING;
+extern "C" void ray_t_init(Ray_t &ray, Vector &start, Vector &end) {
+	ray.Init(start, end);
 }
 extern "C" IClientEntity *icliententitylist_getcliententity(IClientEntityList *client_entity_list, int ent_index) {
 	return client_entity_list->GetClientEntity(ent_index);
 }
-extern "C" bool trace_to_player( QAngle &viewangles )
-{
-    trace_t pTrace;
-    Ray_t pRay;
-    player_info_t pInfo;
-	TriggerbotTraceFilter filter;
-	filter.hit_player = false;
 
-    IClientEntity* pBaseEntity = (getptr_icliententitylist()->GetClientEntity((rainstorm_getivengineclient()->GetLocalPlayer())));;
+extern "C" Vector c_baseentity_getorigin(C_BaseEntity *ent) {
+	return ent->GetAbsOrigin();
+}
+extern "C" int c_baseentity_getindex(C_BaseEntity *ent) {
+	return ent->index;
+}
 
-    if ( !pBaseEntity )
-        return false;
-
-    Vector vDirection;
-
-    AngleVectors( viewangles, &vDirection );
-	Vector eyes = pBaseEntity->GetAbsOrigin();
-	eyes.x += *(float *)(((char *)pBaseEntity)+0x00F8+0);
-	eyes.y += *(float *)(((char *)pBaseEntity)+0x00F8+4);
-	eyes.z += *(float *)(((char *)pBaseEntity)+0x00F8+8);
-    vDirection = vDirection * 8192 + eyes;
-	
-    pRay.Init( eyes, vDirection );
-
-    getptr_ienginetrace()->TraceRay(pRay, ( CONTENTS_SOLID|CONTENTS_MOVEABLE|CONTENTS_MONSTER|CONTENTS_DEBRIS|CONTENTS_HITBOX ), &filter, &pTrace);
-	if ( pTrace.allsolid )
-        return false;
-
-    if ( pTrace.m_pEnt )
-    {
-        int entidx = pTrace.m_pEnt->index;	
-		fprintf(logfile, "%d\n", entidx);
-		fprintf(logfile, "%d\n", pTrace.hitgroup);
-		if (filter.hit_player && pTrace.hitgroup == HITGROUP_HEAD && ((*(int *)((((char *)pTrace.m_pEnt)+0x00AC)) != (*(int *)((((char *)pBaseEntity)+0x00AC)))))) {
-			return true;
-		}
-		if ( getptr_ivengineclient()->GetPlayerInfo( pTrace.m_pEnt->index, &pInfo ) == false )
-            return false;
-
-		//return true;
-        return false; //pTrace.m_pEnt->m_iTeamNum != pBaseEntity->m_iTeamNum; // Avoid teammates.
-    }
-
-    return false;
-}  
+extern "C" void ienginetrace_traceray(IEngineTrace *enginetrace, const Ray_t &ray, unsigned int fMask, ITraceFilter *pTraceFilter, trace_t *pTrace ) {
+	enginetrace->TraceRay(ray, fMask, pTraceFilter, pTrace);
+}

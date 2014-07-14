@@ -159,7 +159,11 @@ impl IClientEntityList {
 }
 impl IEngineTrace {
 	pub fn trace_ray(&self, ray: &Ray_t, mask: u32, filter: Option<*mut IEngineTrace>, trace: &mut trace_t) {
-		
+		let filter_ptr = match filter {
+			Some(ptr) => ptr,
+			None => core::ptr::mut_null()
+		};
+		unsafe { ienginetrace_traceray(self, ray, mask, filter_ptr, trace) };
 	}
 }
 pub enum ConVarValue {
@@ -211,11 +215,16 @@ extern "C" {
 	fn ivengineclient_time(engine: &mut IVEngineClient) -> libc::c_float;
 	fn ivengineclient_getlocalplayer(engine: &IVEngineClient) -> libc::c_int;
 	
+	pub fn getptr_ienginetrace() -> * mut IEngineTrace; // MAYBE NULL
+	fn ienginetrace_traceray(enginetrace: &IEngineTrace, ray: &Ray_t, mask: u32, filter: *mut IEngineTrace, trace: &mut trace_t);
+	
+	pub fn getptr_icliententitylist() -> * mut IClientEntityList; // MAYBE NULL
 	fn icliententitylist_getcliententity(cliententitylist: *const IClientEntityList, entidx: libc::c_int) -> *mut C_BaseEntity;
 	
 	pub fn getptr_ibaseclientdll() -> * mut IBaseClientDLL; // MAYBE NULL
 	pub fn getptr_icvar(app_sys_factory: * mut AppSysFactory) -> * mut ICvar;
 	
+	pub fn trace_t_gethitgroup(trace: *const trace_t) -> int;
 	fn c_baseentity_getorigin(ent: *const C_BaseEntity) -> Vector;
 	fn c_baseentity_getindex(ent: *const C_BaseEntity) -> libc::c_int;
 	

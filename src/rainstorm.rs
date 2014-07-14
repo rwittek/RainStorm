@@ -84,7 +84,7 @@ pub unsafe extern "C" fn rainstorm_preinithook(app_sys_factory: *mut sdk::AppSys
 
 #[no_mangle]
 pub unsafe extern "C" fn rainstorm_postinithook() {
-	let _ = log!("Post-init hook running...\n");
+	log!("Post-init hook running...\n");
 	if cheats::CHEAT_MANAGER.is_not_null() {
 		(*cheats::CHEAT_MANAGER).postinit();
 	} else {
@@ -134,7 +134,24 @@ pub extern "C" fn rainstorm_init(log_fd: libc::c_int, hooked_init_trampoline: *c
 			}
 		}
 	}};
-	
+	unsafe {ICLIENTENTITYLIST_PTR = {
+		let icliententitylist_ptr = sdk::getptr_icliententitylist();
+		match icliententitylist_ptr.is_not_null() {
+			true => { log!("IClientEntityList found at {}\n", icliententitylist_ptr); icliententitylist_ptr },
+			false => { log!("IClientEntityList not found, dying\n");
+				libc::exit(1);
+			}
+		}
+	}};
+	unsafe {IENGINETRACE_PTR = {
+		let ienginetrace_ptr = sdk::getptr_ienginetrace();
+		match ienginetrace_ptr.is_not_null() {
+			true => { log!("IEngineTrace found at {}\n", ienginetrace_ptr); ienginetrace_ptr },
+			false => { log!("IEngineTrace not found, dying\n");
+				libc::exit(1);
+			}
+		}
+	}};
 	unsafe {
 		let mut hooker = vmthook::VMTHooker::new(IBASECLIENTDLL_PTR as *mut *const ());
 		REAL_INIT = hooker.get_orig_method(0);
@@ -154,8 +171,8 @@ pub extern "C" fn rainstorm_init(log_fd: libc::c_int, hooked_init_trampoline: *c
 #[lang = "eh_personality"] extern fn eh_personality() {}
 
 #[lang = "begin_unwind"]
-extern fn begin_unwind(fmt: &core::fmt::Arguments, _file: &str, _line: uint) -> ! {
-	log!("Failed!");
+extern fn begin_unwind(fmt: &core::fmt::Arguments, file: &str, line: uint) -> ! {
+	log!("Failed at line {} of {}!\n", line, file);
 	let _ = logging::log_fmt(fmt).ok().unwrap();
 	unsafe { libc::exit(42); }
 }
