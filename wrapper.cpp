@@ -626,6 +626,12 @@ extern "C" void ivengineclient_clientcmd(IVEngineClient *engine_ptr, const char 
 extern "C" float ivengineclient_time(IVEngineClient *engine_ptr)  {
 	return engine_ptr->Time();
 }
+extern "C" int ivengineclient_getlocalplayer(IVEngineClient *engine_ptr) {
+	return engine_ptr->GetLocalPlayer();
+}
+extern "C" ClientClass *ibaseclientdll_getallclasses(IBaseClientDLL *client) {
+	return client->GetAllClasses();
+}
 
 class TriggerbotTraceFilter : public ITraceFilter
 {
@@ -664,7 +670,9 @@ TraceType_t TriggerbotTraceFilter::GetTraceType() const
 {
     return TRACE_EVERYTHING;
 }
-
+extern "C" IClientEntity *icliententitylist_getcliententity(IClientEntityList *client_entity_list, int ent_index) {
+	return client_entity_list->GetClientEntity(ent_index);
+}
 extern "C" bool trace_to_player( QAngle &viewangles )
 {
     trace_t pTrace;
