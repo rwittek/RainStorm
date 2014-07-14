@@ -26,40 +26,41 @@ impl Cheat for Triggerbot {
 
 impl Triggerbot {
 	fn should_shoot(&self, viewangles: &sdk::QAngle) -> bool {
-		sdk::trace_t pTrace;
-		sdk::Ray_t pRay;
+		let mut ptrace = sdk::trace_t::new();
 		let filter = sdk::create_tracefilter_from_predicate(should_hit_entity);
 
-		IClientEntity* pBaseEntity = (getptr_icliententitylist()->GetClientEntity((rainstorm_getivengineclient()->GetLocalPlayer())));;
+		let localplayer_entidx = IVENGINECLIENT_PTR.as_option().unwrap().get_local_player();
+		let local_baseentity= ICLIENTENTITYLIST_PTR.as_option().unwrap().get_client_entity(localplayer_entidx);
+		
+		let me = match local_baseentity.to_option() {
+			Some(ent) => ent,
+			None => { log!("IClientEntity of local player (id: {}) not found!\n", localplayer_entidx); libc::exit(1); }
+		};
 
-		let me: match pBaseEntity.to_option() {
-			Some(ent) -> ent,
-			None -> { log!("IClientEntity of local player (id: {}) not found!\n", IVENGINECLIENT_PTR->GetLocalPlayer()); libc::exit(1); }
-		}
+		let mut direction = sdk::Vector::new();
 
-		sdk::Vector vDirection;
-
-		sdk::angle_vectors(viewangles, &vDirection );
-		sdk::Vector eyes = me.get_origin();
+		sdk::angle_vectors(viewangles, &direction );
+		let eyes = me.get_origin();
 		
 		let eye_offset_ptr = ((me as *mut IClientEntity as uint) + 0xF8) as *const [float, ..3];
 		eyes.x += eye_offsets[0];
 		eyes.y += eye_offsets[1];
 		eyes.z += eye_offsets[2];
 	
-		vDirection = vDirection * 8192 + eyes;
+		direction = direction * 8192 + eyes;
 		
-		pRay.Init( eyes, vDirection );
+		let ray = sdk::Ray_t::new(eyes, direction);
 
-		getptr_ienginetrace()->trace_ray(pRay, 0x200400B, &filter, &pTrace);
-		if ( pTrace.allsolid )
+		getptr_ienginetrace().as_option().unwrap().trace_ray(ray, 0x200400B, &filter, &pTrace);
+		if ( pTrace.allsolid ) {
 			return false;
+		}
 
 		if ( pTrace.m_pEnt )
 		{
-			int entidx = pTrace.m_pEnt->index;	
+			let entidx = pTrace.m_pEnt.as_option().unwrap().index;	
 			log!("Hit entity {} at hitgroup {}", entidx, pTrace.hitgroup);
-			if (pTrace.hitgroup == HITGROUP_HEAD)//&& ((*(int *)((((char *)pTrace.m_pEnt)+0x00AC)) != (*(int *)((((char *)pBaseEntity)+0x00AC)))))) {
+			if (pTrace.hitgroup == HITGROUP_HEAD) { //&& ((*(int *)((((char *)pTrace.m_pEnt)+0x00AC)) != (*(int *)((((char *)pBaseEntity)+0x00AC)))))) {
 				return true;
 			}
 			return false; //pTrace.m_pEnt->m_iTeamNum != pBaseEntity->m_iTeamNum; // Avoid teammates.
