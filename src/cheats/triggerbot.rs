@@ -2,10 +2,11 @@ use Cheat;
 use sdk;
 use libc;
 use core::prelude::*;
+use core;
 
 pub struct Triggerbot;
 
-fn should_hit_entity(ent: *mut sdk::IHandleEntity, contentsmask: i32) -> bool {
+extern "C" fn should_hit_entity(ent: *const sdk::IHandleEntity, contentsmask: i32) -> bool {
 	false
 }
 impl Cheat for Triggerbot {
@@ -21,7 +22,7 @@ impl Cheat for Triggerbot {
 		if cmd.buttons & 1 == 1 {
 			cmd.buttons = !((!cmd.buttons) | 1); // zero the IN_ATTACK bit
 			unsafe {
-				if self.should_shoot(cmd.viewangles) {
+				if self.should_shoot(&cmd.viewangles) {
 						cmd.buttons = cmd.buttons | 1;
 				}
 			}
@@ -34,8 +35,8 @@ impl Triggerbot {
 		let mut trace = sdk::trace_t::new();
 		let filter = sdk::create_tracefilter_from_predicate(should_hit_entity);
 
-		let localplayer_entidx = ::IVENGINECLIENT_PTR.as_option().unwrap().get_local_player();
-		let local_baseentity= ::ICLIENTENTITYLIST_PTR.as_option().unwrap().get_client_entity(localplayer_entidx);
+		let localplayer_entidx = ::IVENGINECLIENT_PTR.to_option().unwrap().get_local_player();
+		let local_baseentity= ::ICLIENTENTITYLIST_PTR.to_option().unwrap().get_client_entity(localplayer_entidx);
 		
 		let me = match local_baseentity.to_option() {
 			Some(ent) => ent,
@@ -44,7 +45,7 @@ impl Triggerbot {
 
 		let mut direction = sdk::Vector::new();
 
-		sdk::angle_vectors(viewangles, &direction );
+		sdk::angle_vectors(viewangles, &direction, core::ptr::null(), core::ptr::null());
 		let eyes = me.get_origin();
 		
 		let eye_offsets = ((me as *mut sdk::C_BaseEntity as uint) + 0xF8) as *const [f32, ..3];

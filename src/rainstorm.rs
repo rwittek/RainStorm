@@ -24,7 +24,7 @@ mod std {
 }
 
 static mut IVENGINECLIENT_PTR: *mut sdk::IVEngineClient = 0 as *mut sdk::IVEngineClient;
-static mut ICLIENTENTITYLIST_PTR: *mut sdk::IVEngineClient = 0 as *mut sdk::IClientEntityList;
+static mut ICLIENTENTITYLIST_PTR: *mut sdk::IClientEntityList = 0 as *mut sdk::IClientEntityList;
 static mut IBASECLIENTDLL_PTR: *mut sdk::IBaseClientDLL = 0 as *mut sdk::IBaseClientDLL;
 static mut IENGINETRACE_PTR: *mut sdk::IEngineTrace = 0 as *mut sdk::IEngineTrace;
 static mut APPSYSFACTORY_PTR: *mut sdk::AppSysFactory = 0 as *mut sdk::AppSysFactory;

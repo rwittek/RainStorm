@@ -34,7 +34,7 @@ pub struct CBaseTrace {
 	startsolid: bool
 }
 
-pub struct CGameTrace {
+pub struct trace_t {
 	base: CBaseTrace,	// note, this is actually inheritance in C++
 	fractionleftsurface: libc::c_float,
 	surface: csurface_t,
@@ -43,7 +43,6 @@ pub struct CGameTrace {
 	ent: *mut C_BaseEntity,
 	hitbox: libc::c_int
 }
-pub type trace_t = CGameTrace;
 
 pub struct QAngle {
 	pub pitch: libc::c_float,
@@ -98,9 +97,9 @@ pub struct PredicateTraceFilter {
 	predicate: extern "C" fn (*mut IHandleEntity) -> bool
 }
 impl Ray_t {
-	pub fn new(start: &Vector, end: &Vector) {
+	pub fn new(start: &Vector, end: &Vector) -> Ray_t {
 		let ray: Ray_t = core::mem::uninitialized();
-		ray_t_init(start, end);
+		ray_t_init(&ray, start, end);
 		ray
 	}
 }
@@ -129,6 +128,9 @@ impl IVEngineClient {
 	}
 	pub fn time(&mut self) -> f32 {
 		unsafe { ivengineclient_time(self) } 
+	}
+	pub fn get_local_player(&self) -> libc::c_int {
+		unsafe { ivengineclient_getlocalplayer(self) }
 	}
 }
 
@@ -179,6 +181,7 @@ extern "C" {
 	pub fn getptr_ivengineclient() -> * mut IVEngineClient; // MAYBE NULL
 	fn ivengineclient_clientcmd(engine: & mut IVEngineClient, cmd_string: * const c_char);
 	fn ivengineclient_time(engine: &mut IVEngineClient) -> libc::c_float;
+	fn ivengineclient_getlocalplayer(engine: &mut IVEngineClient) -> libc::c_int;
 	
 	pub fn getptr_ibaseclientdll() -> * mut IBaseClientDLL; // MAYBE NULL
 	pub fn getptr_icvar(app_sys_factory: * mut AppSysFactory) -> * mut ICvar;
@@ -194,5 +197,5 @@ extern "C" {
 	
 	pub fn ray_t_init(ray: &mut Ray_t, start: &mut Vector, end: &mut Vector);
 	
-	pub fn create_tracefilter_from_predicate(predicate: extern "C" fn(ent: *const IHandleEntity) -> bool) -> PredicateTraceFilter;
+	pub fn create_tracefilter_from_predicate(predicate: extern "C" fn(ent: *const IHandleEntity, contentsmask: i32) -> bool) -> PredicateTraceFilter;
 }
