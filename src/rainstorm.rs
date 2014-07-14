@@ -1,4 +1,4 @@
-#![feature(intrinsics, lang_items, globs)]
+#![feature(macro_rules, intrinsics, lang_items, globs)]
 #![no_std]
 
 extern crate libc;
@@ -6,7 +6,6 @@ extern crate core;
 extern crate alloc;
 extern crate collections;
 
-pub use logging::log;
 pub use core::prelude::*;
 pub use core::result::{Result, Ok, Err};
 pub use cheats::Cheat;
@@ -56,19 +55,19 @@ pub unsafe fn locate_cinput() -> Option<*mut sdk::CInput> {
 	match result {
 		Some(ptr) => {
 			let cinput_ptr_ptr = *(((ptr as uint) + 2) as *const *const *mut sdk::CInput);
-			format_args!(log, "CInput pointer found at {}\n", cinput_ptr_ptr);
-			format_args!(log, "CInput found at {}\n", *cinput_ptr_ptr);
+			log!("CInput pointer found at {}\n", cinput_ptr_ptr);
+			log!("CInput found at {}\n", *cinput_ptr_ptr);
 			Some(*(cinput_ptr_ptr))
 		},
 		None => {
-			format_args!(log, "CInput not found?!?\n");
+			log!("CInput not found?!?\n");
 			None
 		}
 	}
 }
 #[no_mangle]
 pub unsafe extern "C" fn rainstorm_preinithook(app_sys_factory: *mut sdk::AppSysFactory, physics_factory: *mut sdk::PhysicsFactory, globals: *mut sdk::Globals) {
-	format_args!(log, "pre-init hook running\n");
+	log!("pre-init hook running\n");
 	// TODO: null check
 	APPSYSFACTORY_PTR = app_sys_factory;
 	ICVAR_PTR = sdk::getptr_icvar(app_sys_factory);
@@ -76,22 +75,20 @@ pub unsafe extern "C" fn rainstorm_preinithook(app_sys_factory: *mut sdk::AppSys
 	if cheats::CHEAT_MANAGER.is_not_null() {
 		(*cheats::CHEAT_MANAGER).preinit();
 	} else {
-		format_args!(log, "Cheat manager not found!\n");
+		log!("Cheat manager not found!\n");
 		libc::exit(1);
 	};
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn rainstorm_postinithook() {
-	format_args!(log, "Post-init hook running...\n");
-	unsafe {
-		if cheats::CHEAT_MANAGER.is_not_null() {
-			(*cheats::CHEAT_MANAGER).postinit();
-		} else {
-			format_args!(log, "Cheat manager not found!\n");
-			libc::exit(1);
-		};
-	}
+	let _ = log!("Post-init hook running...\n");
+	if cheats::CHEAT_MANAGER.is_not_null() {
+		(*cheats::CHEAT_MANAGER).postinit();
+	} else {
+		log!("Cheat manager not found!\n");
+		libc::exit(1);
+	};
 }
 
 #[no_mangle]
@@ -100,7 +97,7 @@ pub extern "C" fn rainstorm_process_usercmd(cmd: &mut sdk::CUserCmd) {
 		if cheats::CHEAT_MANAGER.is_not_null() {
 			(*cheats::CHEAT_MANAGER).process_usercmd(cmd);
 		} else {
-			format_args!(log, "Cheat manager not found!\n");
+			log!("Cheat manager not found!\n");
 			libc::exit(1);
 		};
 	}
@@ -118,8 +115,8 @@ pub extern "C" fn rainstorm_init(log_fd: libc::c_int, hooked_init_trampoline: *c
 		IVENGINECLIENT_PTR = {
 			let engine_ptr = sdk::getptr_ivengineclient();
 			match engine_ptr.is_not_null() {
-				true => { format_args!(log, "Engine found at {}.\n", engine_ptr); engine_ptr },
-				false => { format_args!(log, "Engine not found, dying\n");
+				true => { log!("Engine found at {}.\n", engine_ptr); engine_ptr },
+				false => { log!("Engine not found, dying\n");
 					libc::exit(1);
 				}
 			}
@@ -129,8 +126,8 @@ pub extern "C" fn rainstorm_init(log_fd: libc::c_int, hooked_init_trampoline: *c
 	unsafe {IBASECLIENTDLL_PTR = {
 		let ibaseclientdll_ptr = sdk::getptr_ibaseclientdll();
 		match ibaseclientdll_ptr.is_not_null() {
-			true => { format_args!(log, "IBaseClientDLL found at {}\n", ibaseclientdll_ptr); ibaseclientdll_ptr },
-			false => { format_args!(log, "IBaseClientDLL not found, dying\n");
+			true => { log!("IBaseClientDLL found at {}\n", ibaseclientdll_ptr); ibaseclientdll_ptr },
+			false => { log!("IBaseClientDLL not found, dying\n");
 				libc::exit(1);
 			}
 		}
@@ -142,7 +139,7 @@ pub extern "C" fn rainstorm_init(log_fd: libc::c_int, hooked_init_trampoline: *c
 		REAL_CREATEMOVE = hooker.get_orig_method(21);
 		hooker.hook(0, hooked_init_trampoline);
 		hooker.hook(21, hooked_createmove_trampoline);
-		format_args!(log, "Hooks installed.\n");
+		log!("Hooks installed.\n");
 		//engine.ClientCmd("say hello world");
 	};
 	
@@ -154,8 +151,8 @@ pub extern "C" fn rainstorm_init(log_fd: libc::c_int, hooked_init_trampoline: *c
 #[lang = "stack_exhausted"] extern fn stack_exhausted() {}
 #[lang = "eh_personality"] extern fn eh_personality() {}
 #[lang = "begin_unwind"] extern fn begin_unwind(fmt: &core::fmt::Arguments, file: &str, line: uint) -> ! {
-	format_args!(log, "Failed!");
-	log(fmt);
+	log!("Failed!");
+	logging::log_fmt(fmt);
 	unsafe { libc::exit(42); }
 }
 

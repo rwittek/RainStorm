@@ -45,3 +45,4 @@ rainstorm.bc
 *.o
 target/rainstorm.exp
 libs/*
+libc.lib
