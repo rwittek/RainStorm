@@ -1,5 +1,4 @@
 use core;
-use log;
 use libc;
 use core::option::{Some, None, Option};
 use core::ptr::RawPtr;
@@ -18,13 +17,13 @@ impl VMTHooker {
 		let vmt_ptr: *const VMT = core::mem::transmute(*vmt_ptr_ptr);
 		// yes, we do leak this.
 		// yolo.
-		format_args!(log, "Allocating new VMT to patch object {}...\n", vmt_ptr_ptr);
+		log!("Allocating new VMT to patch object {}...\n", vmt_ptr_ptr);
 		let new_vmt = libc::malloc(core::mem::size_of::<VMT>() as u32) as *mut VMT;
 		if new_vmt.is_null() {
-			format_args!(log, "malloc() -> NULL when trying to allocate VMT\n");
+			log!("malloc() -> NULL when trying to allocate VMT\n");
 			libc::exit(1);
 		} else {
-			format_args!(log, "VMT allocated: {}\n", new_vmt);
+			log!("VMT allocated: {}\n", new_vmt);
 		}
 		*new_vmt = *vmt_ptr;
 		
@@ -36,13 +35,13 @@ impl VMTHooker {
 		
 		*vmt_ptr_ptr = (new_vmt) as *const VMT as *const ();
 		
-		format_args!(log, "Hooray! We didn't segfault!\n");
+		log!("Hooray! We didn't segfault!\n");
 		
 		hooker
 	}
 	
 	pub unsafe fn hook(&mut self, offset: uint, hook: *const ()) {
-		format_args!(log, "Patching VMT {} offset {} with {}.\n", self.patched_vmt_ptr, offset, hook);
+		log!("Patching VMT {} offset {} with {}.\n", self.patched_vmt_ptr, offset, hook);
 		(*(self.patched_vmt_ptr))[offset] = hook;
 	}
 	

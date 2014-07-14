@@ -1,8 +1,20 @@
+#![macro_escape]
 use core::prelude::*;
 use core;
 use core::fmt::FormatWriter;
 use core::raw::Repr;
 use libc;
+
+
+macro_rules! log(
+
+	// TODO: could make an oopsie if we have several threads
+    ($($arg:tt)*) => ({
+		#[allow(unused_imports)] // we need this for log_fmt
+		use core::fmt::FormatWriter;
+		let _ =  format_args!(::logging::log_fmt, $($arg)*).ok().unwrap();
+    })
+)
 
 static mut LOGGER: Option<Logger> = None;
 
@@ -39,7 +51,7 @@ pub unsafe fn set_fd(fd: libc::c_int) -> core::result::Result<(), ()> {
 	}
 }
 
-pub fn log(args: &core::fmt::Arguments) -> core::fmt::Result {
+pub fn log_fmt(args: &core::fmt::Arguments) -> core::fmt::Result {
 	unsafe { match LOGGER {
 		Some(mut logger) => {logger.write_fmt(args); Ok(())},
 		None => Err(core::fmt::WriteError)
