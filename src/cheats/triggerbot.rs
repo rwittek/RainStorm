@@ -36,7 +36,7 @@ impl Triggerbot {
 		//let filter = sdk::create_tracefilter_from_predicate(should_hit_entity);
 
 		let localplayer_entidx = unsafe { ::IVENGINECLIENT_PTR.to_option().unwrap().get_local_player() };
-		let local_baseentity= unsafe { ::ICLIENTENTITYLIST_PTR.to_option().unwrap().get_client_entity(localplayer_entidx) };
+		let local_baseentity = unsafe { ::ICLIENTENTITYLIST_PTR.to_option().unwrap().get_client_entity(localplayer_entidx) };
 		
 		let me: &mut sdk::C_BaseEntity = if local_baseentity.is_not_null() {
 			unsafe { core::mem::transmute(local_baseentity) }

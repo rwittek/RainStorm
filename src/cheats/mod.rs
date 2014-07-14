@@ -3,12 +3,12 @@ use alloc::owned::Box;
 use collections::Vec;
 use {Option, Some, None};
 use core::iter::Iterator;
-use self::triggerbot::Triggerbot;
 use alloc;
 use core;
 
 pub mod triggerbot;
 pub mod speedhack;
+pub mod cvarunlocker;
 
 pub static mut CHEAT_MANAGER: *mut CheatManager = 0 as *mut CheatManager;
 
@@ -34,9 +34,10 @@ pub struct CheatManager {
 
 impl CheatManager {
 	pub fn new() -> CheatManager {
-		let cheat: Box<Triggerbot> = box Cheat::new();
+		let triggerbot: Box<triggerbot::Triggerbot> = box Cheat::new();
+		let cvarunlocker: Box<cvarunlocker::CvarUnlocker> = box Cheat::new();
 		let mut mgr = CheatManager { cheats: Vec::new() };
-		mgr.cheats.push(cheat);
+		mgr.cheats.push(cvarunlocker);
 		mgr
 	}
 	

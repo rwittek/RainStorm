@@ -193,14 +193,14 @@ impl ConVar {
 }
 
 impl ICvar {
-	pub fn find_var(&mut self, name: &str) -> Option<*mut ConVar> {
+	pub fn find_var(&self, name: &str) -> Option<*mut ConVar> {
 		let mut buf = [0u8, ..256];
 		if name.len() >= buf.len() {
 			return None
 		} else {
 			unsafe { core::ptr::copy_nonoverlapping_memory(transmute::<*const u8, *mut u8>(buf.repr().data), transmute(name.repr().data), name.len()); }
 			buf[name.len()] = 0;
-			let raw_convar = unsafe { icvar_findvar(self as *mut ICvar, transmute(buf.repr().data)) };
+			let raw_convar = unsafe { icvar_findvar(self as *const ICvar, transmute(buf.repr().data)) };
 			match raw_convar.is_null() {
 				true => None,
 				false => Some(raw_convar)
@@ -229,7 +229,7 @@ extern "C" {
 	fn c_baseentity_getindex(ent: *const C_BaseEntity) -> libc::c_int;
 	
 	pub fn getptr_cinput(client: *mut IBaseClientDLL) -> *mut CInput;
-	fn icvar_findvar(icvar: * mut ICvar, name: * const char) -> * mut ConVar; // MAYBE NULL;
+	fn icvar_findvar(icvar: * const ICvar, name: * const char) -> * mut ConVar; // MAYBE NULL;
 	pub fn convar_setvalue_raw_int(cvar: * mut ConVar, value: libc::c_int);
 	pub fn convar_setvalue_str(cvar: * mut ConVar, value: CString);
 	pub fn convar_clearflags(cvar: * mut ConVar);
