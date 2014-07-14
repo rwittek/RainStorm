@@ -46,4 +46,4 @@ rainstorm.bc
 target/rainstorm.exp
 libs/*
 libc.lib
-wrapper.lib
+#wrapper.lib
