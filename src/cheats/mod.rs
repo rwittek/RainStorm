@@ -8,6 +8,7 @@ use alloc;
 use core;
 
 pub mod triggerbot;
+pub mod speedhack;
 
 pub static mut CHEAT_MANAGER: *mut CheatManager = 0 as *mut CheatManager;
 
