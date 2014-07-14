@@ -51,25 +51,20 @@ impl Triggerbot {
 		
 		pRay.Init( eyes, vDirection );
 
-		getptr_ienginetrace()->TraceRay(pRay, ( CONTENTS_SOLID|CONTENTS_MOVEABLE|CONTENTS_MONSTER|CONTENTS_DEBRIS|CONTENTS_HITBOX ), filter.itracefilter, &pTrace);
+		getptr_ienginetrace()->trace_ray(pRay, 0x200400B, &filter, &pTrace);
 		if ( pTrace.allsolid )
 			return false;
 
 		if ( pTrace.m_pEnt )
 		{
 			int entidx = pTrace.m_pEnt->index;	
-			fprintf(logfile, "%d\n", entidx);
-			fprintf(logfile, "%d\n", pTrace.hitgroup);
-			if (filter.hit_player && pTrace.hitgroup == HITGROUP_HEAD && ((*(int *)((((char *)pTrace.m_pEnt)+0x00AC)) != (*(int *)((((char *)pBaseEntity)+0x00AC)))))) {
+			log!("Hit entity {} at hitgroup {}", entidx, pTrace.hitgroup);
+			if (pTrace.hitgroup == HITGROUP_HEAD)//&& ((*(int *)((((char *)pTrace.m_pEnt)+0x00AC)) != (*(int *)((((char *)pBaseEntity)+0x00AC)))))) {
 				return true;
 			}
-			if ( getptr_ivengineclient()->GetPlayerInfo( pTrace.m_pEnt->index, &pInfo ) == false )
-				return false;
-
-			//return true;
 			return false; //pTrace.m_pEnt->m_iTeamNum != pBaseEntity->m_iTeamNum; // Avoid teammates.
 		}
 
-		return false;
+		false;
 	}
 }
