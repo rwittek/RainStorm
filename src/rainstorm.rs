@@ -158,6 +158,7 @@ extern fn begin_unwind(fmt: &core::fmt::Arguments, _file: &str, _line: uint) -> 
 	unsafe { libc::exit(42); }
 }
 
+#[allow(non_snake_case_functions)]
 #[no_mangle]
 pub extern "C" fn _imp___onexit() {
 }
