@@ -19,10 +19,43 @@ pub enum PhysicsFactory {}
 pub enum Globals {}
 pub enum CInput {}
 
+pub struct CBaseTrace {
+	startpos: Vector,
+	endpos: Vector,
+	plane: cplane_t,
+	fraction: libc::c_float,
+	contents: libc::c_int,
+	dispFlags: u16,
+	allsolid: bool,
+	startsolid: bool
+}
+
+pub struct CGameTrace {
+	base: CBaseTrace,	// note, this is actually inheritance in C++
+	fractionleftsurface: libc::c_float,
+	surface: csurface_t,
+	hitgroup: libc::c_int,
+	physicsbone: libc::c_short,
+	ent: *mut C_BaseEntity,
+	hitbox: libc::c_int
+}
+
 pub struct QAngle {
-	pub pitch: f32,
-	pub yaw: f32,
-	pub roll: f32
+	pub pitch: libc::c_float,
+	pub yaw: libc::c_float,
+	pub roll: libc::c_float
+}
+pub struct csurface_t {
+	name: *const libc::c_char,
+	surface_props: libc::c_short,
+	flags: u16
+}
+pub struct cplane_t {
+	normal: Vector,
+	float: libc::c_float,
+	type_: u8,
+	signbits: u8,
+	pad: [u8, ..2]
 }
 
 pub struct CUserCmd {
