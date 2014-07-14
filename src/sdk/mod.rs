@@ -19,6 +19,7 @@ pub enum PhysicsFactory {}
 pub enum Globals {}
 pub enum CInput {}
 pub enum C_BaseEntity {}
+pub enum IHandleEntity {}
 
 pub struct CBaseTrace {
 	startpos: Vector,
@@ -87,12 +88,31 @@ pub struct CUserCmd {
 
 	pub hasbeenpredicted: bool
 }
+pub struct Ray_t {
+	data: [u8, ..128] //todo: get proper size
+}
+pub struct PredicateTraceFilter {
+	_vmt_ptr: *const (),
+	predicate: extern "C" fn (*mut IHandleEntity) -> bool
+}
+impl Ray_t {
+	pub fn new(start: &Vector, end: &Vector) {
+		let ray: Ray_t = core::mem::uninitialized();
+		ray_t_init(start, end);
+		ray
+	}
+}
+		
 impl trace_t {
 	pub unsafe fn new() -> trace_t {
 		core::mem::uninitialized() // yolo
 	}
 }
-
+impl Vector {
+	pub fn new() -> Vector {
+		Vector { x: 0f32, y: 0f32, z: 0f32 }
+	}
+}
 impl IVEngineClient {
 	pub fn client_cmd(&mut self, command: &'static str) -> Result<(), &'static str> {
 		let mut buf = [0u8, ..256];
@@ -168,5 +188,9 @@ extern "C" {
 	pub fn convar_clearflags(cvar: * mut ConVar);
 	pub fn convar_freeze(cvar: * mut ConVar);
 	
-	pub fn trace_to_player(viewangles: &QAngle ) -> bool;
+	pub fn angle_vectors(angle: &QAngle, vec1: *mut Vector, vec2: *mut Vector, vec3: *mut Vector);
+	
+	pub fn ray_t_init(ray: &mut Ray_t, start: &mut Vector, end: &mut Vector);
+	
+	pub fn create_tracefilter_from_predicate(predicate: extern "C" fn(ent: *const IHandleEntity) -> bool) -> PredicateTraceFilter;
 }

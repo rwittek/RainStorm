@@ -1,9 +1,13 @@
 use Cheat;
 use sdk;
 use libc;
+use core::prelude::*;
 
 pub struct Triggerbot;
 
+fn should_hit_entity(ent: *mut sdk::IHandleEntity, contentsmask: i32) -> bool {
+	false
+}
 impl Cheat for Triggerbot {
 	fn new() -> Triggerbot {
 		Triggerbot
@@ -43,7 +47,7 @@ impl Triggerbot {
 		sdk::angle_vectors(viewangles, &direction );
 		let eyes = me.get_origin();
 		
-		let eye_offsets = ((me as *mut IClientEntity as uint) + 0xF8) as *const [float, ..3];
+		let eye_offsets = ((me as *mut sdk::C_BaseEntity as uint) + 0xF8) as *const [f32, ..3];
 		eyes.x += eye_offsets[0];
 		eyes.y += eye_offsets[1];
 		eyes.z += eye_offsets[2];
@@ -59,7 +63,7 @@ impl Triggerbot {
 
 		if ( trace.m_pEnt )
 		{
-			let entidx = race.m_pEnt.as_option().unwrap().index;	
+			let entidx = trace.m_pEnt.as_option().unwrap().index;	
 			log!("Hit entity {} at hitgroup {}", entidx, trace.hitgroup);
 			if (trace.hitgroup == HITGROUP_HEAD) { //&& ((*(int *)((((char *)pTrace.m_pEnt)+0x00AC)) != (*(int *)((((char *)pBaseEntity)+0x00AC)))))) {
 				return true;
