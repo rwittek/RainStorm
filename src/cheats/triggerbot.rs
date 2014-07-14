@@ -34,8 +34,8 @@ impl Triggerbot {
 		let mut trace = sdk::trace_t::new();
 		let filter = sdk::create_tracefilter_from_predicate(should_hit_entity);
 
-		let localplayer_entidx = IVENGINECLIENT_PTR.as_option().unwrap().get_local_player();
-		let local_baseentity= ICLIENTENTITYLIST_PTR.as_option().unwrap().get_client_entity(localplayer_entidx);
+		let localplayer_entidx = ::IVENGINECLIENT_PTR.as_option().unwrap().get_local_player();
+		let local_baseentity= ::ICLIENTENTITYLIST_PTR.as_option().unwrap().get_client_entity(localplayer_entidx);
 		
 		let me = match local_baseentity.to_option() {
 			Some(ent) => ent,
@@ -48,15 +48,15 @@ impl Triggerbot {
 		let eyes = me.get_origin();
 		
 		let eye_offsets = ((me as *mut sdk::C_BaseEntity as uint) + 0xF8) as *const [f32, ..3];
-		eyes.x += eye_offsets[0];
-		eyes.y += eye_offsets[1];
-		eyes.z += eye_offsets[2];
+		eyes.x += (*eye_offsets)[0];
+		eyes.y += (*eye_offsets)[1];
+		eyes.z += (*eye_offsets)[2];
 	
 		direction = direction * 8192 + eyes;
 		
 		let ray = sdk::Ray_t::new(eyes, direction);
 
-		getptr_ienginetrace().as_option().unwrap().trace_ray(ray, 0x200400B, &filter, &trace);
+		::IENGINETRACE_PTR.as_option().unwrap().trace_ray(ray, 0x200400B, &filter, &trace);
 		if ( trace.allsolid ) {
 			return false;
 		}
@@ -65,7 +65,7 @@ impl Triggerbot {
 		{
 			let entidx = trace.m_pEnt.as_option().unwrap().index;	
 			log!("Hit entity {} at hitgroup {}", entidx, trace.hitgroup);
-			if (trace.hitgroup == HITGROUP_HEAD) { //&& ((*(int *)((((char *)pTrace.m_pEnt)+0x00AC)) != (*(int *)((((char *)pBaseEntity)+0x00AC)))))) {
+			if (trace.hitgroup ==  1) { //&& ((*(int *)((((char *)pTrace.m_pEnt)+0x00AC)) != (*(int *)((((char *)pBaseEntity)+0x00AC)))))) {
 				return true;
 			}
 			return false; //pTrace.m_pEnt->m_iTeamNum != pBaseEntity->m_iTeamNum; // Avoid teammates.

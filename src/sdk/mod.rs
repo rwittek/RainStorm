@@ -20,6 +20,8 @@ pub enum Globals {}
 pub enum CInput {}
 pub enum C_BaseEntity {}
 pub enum IHandleEntity {}
+pub enum IClientEntityList {}
+pub enum IEngineTrace {}
 
 pub struct CBaseTrace {
 	startpos: Vector,
