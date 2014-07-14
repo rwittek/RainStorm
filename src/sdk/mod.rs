@@ -8,7 +8,7 @@ use core::raw::Repr;
 use core::mem::transmute;
 use core::ptr::RawPtr;
 
-use CString;
+pub use CString;
 // opaque phantom types
 pub enum IVEngineClient {}
 pub enum IBaseClientDLL {}
@@ -57,7 +57,7 @@ impl IVEngineClient {
 		}
 		unsafe { core::ptr::copy_nonoverlapping_memory(transmute::<*const u8, *mut u8>(buf.repr().data), transmute(command.repr().data), command.len()); };
 		buf[command.len()] = 0;
-		unsafe { ivengineclient_clientcmd(self, unsafe { core::mem::transmute(buf.repr().data )}) };
+		unsafe { ivengineclient_clientcmd(self, core::mem::transmute(buf.repr().data )) };
 		
 		Ok(())
 	}

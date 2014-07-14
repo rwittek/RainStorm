@@ -13,7 +13,7 @@ pub use alloc::owned::Box;
 use core::raw::Repr;
 
 
-mod sdk;
+pub mod sdk;
 mod logging;
 mod vmthook;
 mod utils;
@@ -66,7 +66,7 @@ pub unsafe fn locate_cinput() -> Option<*mut sdk::CInput> {
 	}
 }
 #[no_mangle]
-pub unsafe extern "C" fn rainstorm_preinithook(app_sys_factory: *mut sdk::AppSysFactory, physics_factory: *mut sdk::PhysicsFactory, globals: *mut sdk::Globals) {
+pub unsafe extern "C" fn rainstorm_preinithook(app_sys_factory: *mut sdk::AppSysFactory, _physics_factory: *mut sdk::PhysicsFactory, _globals: *mut sdk::Globals) {
 	log!("pre-init hook running\n");
 	// TODO: null check
 	APPSYSFACTORY_PTR = app_sys_factory;
@@ -109,7 +109,7 @@ pub unsafe extern "C" fn rainstorm_getivengineclient() -> *mut sdk::IVEngineClie
 }
 #[no_mangle]
 pub extern "C" fn rainstorm_init(log_fd: libc::c_int, hooked_init_trampoline: *const (), hooked_createmove_trampoline: *const ()) {
-	unsafe { logging::set_fd(log_fd) };
+	unsafe { let _ = logging::set_fd(log_fd).ok().unwrap(); }
 
 	unsafe {
 		IVENGINECLIENT_PTR = {
@@ -150,9 +150,11 @@ pub extern "C" fn rainstorm_init(log_fd: libc::c_int, hooked_init_trampoline: *c
 
 #[lang = "stack_exhausted"] extern fn stack_exhausted() {}
 #[lang = "eh_personality"] extern fn eh_personality() {}
-#[lang = "begin_unwind"] extern fn begin_unwind(fmt: &core::fmt::Arguments, file: &str, line: uint) -> ! {
+
+#[lang = "begin_unwind"]
+extern fn begin_unwind(fmt: &core::fmt::Arguments, _file: &str, _line: uint) -> ! {
 	log!("Failed!");
-	logging::log_fmt(fmt);
+	let _ = logging::log_fmt(fmt).ok().unwrap();
 	unsafe { libc::exit(42); }
 }
 
