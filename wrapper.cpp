@@ -632,7 +632,9 @@ extern "C" int ivengineclient_getlocalplayer(IVEngineClient *engine_ptr) {
 extern "C" ClientClass *ibaseclientdll_getallclasses(IBaseClientDLL *client) {
 	return client->GetAllClasses();
 }
-
+extern "C" void angle_vectors(QAngle &angle, Vector *vec1, Vector *vec2, Vector *vec3) {
+	AngleVectors(angle, vec1, vec2, vec3);
+}
 class TriggerbotTraceFilter : public ITraceFilter
 {
 	public:
