@@ -148,7 +148,7 @@ pub extern "C" fn rainstorm_init(log_fd: libc::c_int, hooked_init_trampoline: *c
 	
 	unsafe { CINPUT_PTR = locate_cinput().unwrap() };
 		
-	cheats::cheatmgr_init();
+	cheats::cheatmgr_setup();
 }
 
 #[lang = "stack_exhausted"] extern fn stack_exhausted() {}

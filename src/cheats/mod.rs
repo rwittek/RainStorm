@@ -22,9 +22,9 @@ pub trait Cheat {
 	fn new() -> Self;
 	fn get_name<'a>(&'a self) -> &'a str;
 	
-	fn preinit(&mut self) {};
-	fn postinit(&mut self) {};
-	fn process_usercmd(&mut self, &mut sdk::CUserCmd) {};
+	fn preinit(&mut self) {}
+	fn postinit(&mut self) {}
+	fn process_usercmd(&mut self, &mut sdk::CUserCmd) {}
 }
 
 pub struct CheatManager {
@@ -38,9 +38,15 @@ impl CheatManager {
 		mgr.cheats.push(tb);
 		mgr
 	}
+	
 	pub fn preinit(&mut self) {
 		for cheat in self.cheats.mut_iter() {
 			cheat.preinit();
+		}
+	}
+	pub fn postinit(&mut self) {
+		for cheat in self.cheats.mut_iter() {
+			cheat.postinit();
 		}
 	}
 	pub fn process_usercmd(&mut self, cmd: &mut sdk::CUserCmd) {
