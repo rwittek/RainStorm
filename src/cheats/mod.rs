@@ -34,9 +34,9 @@ pub struct CheatManager {
 
 impl CheatManager {
 	pub fn new() -> CheatManager {
-		let tb: Box<Triggerbot> = box Cheat::new();
+		let cheat: Box<Triggerbot> = box Cheat::new();
 		let mut mgr = CheatManager { cheats: Vec::new() };
-		mgr.cheats.push(tb);
+		mgr.cheats.push(cheat);
 		mgr
 	}
 	
