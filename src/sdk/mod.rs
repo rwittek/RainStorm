@@ -18,6 +18,7 @@ pub enum AppSysFactory {}
 pub enum PhysicsFactory {}
 pub enum Globals {}
 pub enum CInput {}
+pub enum C_BaseEntity {}
 
 pub struct CBaseTrace {
 	startpos: Vector,
@@ -39,6 +40,7 @@ pub struct CGameTrace {
 	ent: *mut C_BaseEntity,
 	hitbox: libc::c_int
 }
+pub type trace_t = CGameTrace;
 
 pub struct QAngle {
 	pub pitch: libc::c_float,
@@ -57,7 +59,11 @@ pub struct cplane_t {
 	signbits: u8,
 	pad: [u8, ..2]
 }
-
+pub struct Vector {
+	x: libc::c_float,
+	y: libc::c_float,
+	z: libc::c_float
+}
 pub struct CUserCmd {
 	vtable_ptr: *const i32,
 	pub command_number: i32,
@@ -80,6 +86,11 @@ pub struct CUserCmd {
 	pub mousedy: u16,
 
 	pub hasbeenpredicted: bool
+}
+impl trace_t {
+	pub unsafe fn new() -> trace_t {
+		core::mem::uninitialized() // yolo
+	}
 }
 
 impl IVEngineClient {
