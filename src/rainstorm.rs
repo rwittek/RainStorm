@@ -72,37 +72,26 @@ pub unsafe extern "C" fn rainstorm_preinithook(app_sys_factory: *mut sdk::AppSys
 	// TODO: null check
 	APPSYSFACTORY_PTR = app_sys_factory;
 	ICVAR_PTR = sdk::getptr_icvar(app_sys_factory);
+
+	if cheats::CHEAT_MANAGER.is_not_null() {
+		(*cheats::CHEAT_MANAGER).preinit();
+	} else {
+		format_args!(log, "Cheat manager not found!\n");
+		libc::exit(1);
+	};
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn rainstorm_postinithook() {
 	format_args!(log, "Post-init hook running...\n");
-	//let sv_cheats = (*ICVAR_PTR.unwrap()).find_var("sv_cheats");
-	//match sv_cheats {
-	//	Some(cheats) => { (*cheats).setvalue_raw(sdk::Int(1)); log_print("sv_cheats 1 OK\n") },
-	//	None => log_print("No sv_cheats?!"),
-	//};
-	//let cvar_name = (*ICVAR_PTR.unwrap()).find_var("name");
-	//match cvar_name {
-	//	Some(name) => {
-	//		log_print("found name\n");
-			//(*name).setvalue(sdk::Str(CString::new("lil' timmy\0").unwrap()));
-			//(*name).freeze();
-			//log_print("name changed\n");
-	//	}, 
-	//	None => log_print("no name?!\n")
-	//}
-	//let cvar_interp = (*ICVAR_PTR.unwrap()).find_var("cl_interp");
-	//match cvar_interp {
-	//	Some(interp) => {
-	//		log_print("found interp\n");
-	//		//(*interp).clearflags();
-	//		//(*interp).setvalue(sdk::Str(CString::new("20").unwrap()));
-	//		//(*interp).freeze();
-	//		log_print("interp changed\n");
-	//	}, 
-	//	None => log_print("no interp?!\n")
-	//}
+	unsafe {
+		if cheats::CHEAT_MANAGER.is_not_null() {
+			(*cheats::CHEAT_MANAGER).postinit();
+		} else {
+			format_args!(log, "Cheat manager not found!\n");
+			libc::exit(1);
+		};
+	}
 }
 
 #[no_mangle]
