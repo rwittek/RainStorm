@@ -133,7 +133,11 @@ impl IVEngineClient {
 		unsafe { ivengineclient_getlocalplayer(self) }
 	}
 }
-
+impl IClientEntityList {
+	pub fn get_client_entity(&self, entidx: libc::c_int) -> *mut C_BaseEntity {
+		unsafe {icliententitylist_getcliententity(self, entidx) }
+	}
+}
 pub enum ConVarValue {
 	Int(libc::c_int),
 	Str(CString)
@@ -182,6 +186,8 @@ extern "C" {
 	fn ivengineclient_clientcmd(engine: & mut IVEngineClient, cmd_string: * const c_char);
 	fn ivengineclient_time(engine: &mut IVEngineClient) -> libc::c_float;
 	fn ivengineclient_getlocalplayer(engine: &mut IVEngineClient) -> libc::c_int;
+	
+	fn icliententitylist_getcliententity(cliententitylist: *const IClientEntityList, entidx: libc::c_int) -> *mut C_BaseEntity;
 	
 	pub fn getptr_ibaseclientdll() -> * mut IBaseClientDLL; // MAYBE NULL
 	pub fn getptr_icvar(app_sys_factory: * mut AppSysFactory) -> * mut ICvar;

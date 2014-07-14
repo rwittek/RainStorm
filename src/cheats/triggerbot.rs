@@ -38,14 +38,15 @@ impl Triggerbot {
 		let localplayer_entidx = ::IVENGINECLIENT_PTR.to_option().unwrap().get_local_player();
 		let local_baseentity= ::ICLIENTENTITYLIST_PTR.to_option().unwrap().get_client_entity(localplayer_entidx);
 		
-		let me = match local_baseentity.to_option() {
-			Some(ent) => ent,
-			None => { log!("IClientEntity of local player (id: {}) not found!\n", localplayer_entidx); libc::exit(1); }
+		let me = if local_baseentity.is_not_null() {
+			local_baseentity
+		} else {
+			log!("IClientEntity of local player (id: {}) not found!\n", localplayer_entidx); libc::exit(1); 
 		};
 
 		let mut direction = sdk::Vector::new();
 
-		sdk::angle_vectors(viewangles, &direction, core::ptr::null(), core::ptr::null());
+		sdk::angle_vectors(viewangles, &mut direction, core::ptr::mut_null(), core::ptr::mut_null());
 		let eyes = me.get_origin();
 		
 		let eye_offsets = ((me as *mut sdk::C_BaseEntity as uint) + 0xF8) as *const [f32, ..3];
@@ -55,16 +56,16 @@ impl Triggerbot {
 	
 		direction = direction * 8192 + eyes;
 		
-		let ray = sdk::Ray_t::new(eyes, direction);
+		let ray = sdk::Ray_t::new(eyes, &direction);
 
-		::IENGINETRACE_PTR.as_option().unwrap().trace_ray(ray, 0x200400B, &filter, &trace);
-		if ( trace.allsolid ) {
+		::IENGINETRACE_PTR.to_option().unwrap().trace_ray(ray, 0x200400B, &filter, &trace);
+		if ( trace.base.allsolid ) {
 			return false;
 		}
 
-		if ( trace.m_pEnt )
+		if ( trace.ent.is_not_null() )
 		{
-			let entidx = trace.m_pEnt.as_option().unwrap().index;	
+			let entidx = trace.ent.to_option().unwrap().index;	
 			log!("Hit entity {} at hitgroup {}", entidx, trace.hitgroup);
 			if (trace.hitgroup ==  1) { //&& ((*(int *)((((char *)pTrace.m_pEnt)+0x00AC)) != (*(int *)((((char *)pBaseEntity)+0x00AC)))))) {
 				return true;
