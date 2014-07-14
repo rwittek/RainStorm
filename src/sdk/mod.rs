@@ -30,17 +30,17 @@ pub struct CBaseTrace {
 	fraction: libc::c_float,
 	contents: libc::c_int,
 	dispFlags: u16,
-	allsolid: bool,
+	pub allsolid: bool,
 	startsolid: bool
 }
 
 pub struct trace_t {
-	base: CBaseTrace,	// note, this is actually inheritance in C++
+	pub base: CBaseTrace,	// note, this is actually inheritance in C++
 	fractionleftsurface: libc::c_float,
 	surface: csurface_t,
-	hitgroup: libc::c_int,
+	pub hitgroup: libc::c_int,
 	physicsbone: libc::c_short,
-	ent: *mut C_BaseEntity,
+	pub ent: *mut C_BaseEntity,
 	hitbox: libc::c_int
 }
 
@@ -62,9 +62,9 @@ pub struct cplane_t {
 	pad: [u8, ..2]
 }
 pub struct Vector {
-	x: libc::c_float,
-	y: libc::c_float,
-	z: libc::c_float
+	pub x: libc::c_float,
+	pub y: libc::c_float,
+	pub z: libc::c_float
 }
 pub struct CUserCmd {
 	vtable_ptr: *const i32,
@@ -98,9 +98,20 @@ pub struct PredicateTraceFilter {
 }
 impl Ray_t {
 	pub fn new(start: &Vector, end: &Vector) -> Ray_t {
-		let ray: Ray_t = core::mem::uninitialized();
-		ray_t_init(&ray, start, end);
+		let mut ray: Ray_t;
+		unsafe {
+			ray = core::mem::uninitialized();
+			ray_t_init(&mut ray, start, end);
+		}
 		ray
+	}
+}
+impl C_BaseEntity {
+	pub fn get_origin(&self) -> Vector {
+		unsafe { c_baseentity_getorigin(self) }
+	}
+	pub fn get_index(&self) -> libc::c_int {
+		unsafe { c_baseentity_getindex(self) }
 	}
 }
 		
@@ -112,6 +123,14 @@ impl trace_t {
 impl Vector {
 	pub fn new() -> Vector {
 		Vector { x: 0f32, y: 0f32, z: 0f32 }
+	}
+	pub fn scale(&self, factor: f32) -> Vector {
+		Vector {x: self.x * factor, y: self.y * factor, z: self.z * factor}
+	}
+}
+impl core::ops::Add<Vector, Vector> for Vector {
+	fn add(&self, rhs: &Vector) -> Vector {
+		Vector {x: self.x + rhs.x, y: self.y + rhs.y, z: self.z + rhs.z}
 	}
 }
 impl IVEngineClient {
@@ -136,6 +155,11 @@ impl IVEngineClient {
 impl IClientEntityList {
 	pub fn get_client_entity(&self, entidx: libc::c_int) -> *mut C_BaseEntity {
 		unsafe {icliententitylist_getcliententity(self, entidx) }
+	}
+}
+impl IEngineTrace {
+	pub fn trace_ray(&self, ray: &Ray_t, mask: u32, filter: Option<*mut IEngineTrace>, trace: &mut trace_t) {
+		
 	}
 }
 pub enum ConVarValue {
@@ -185,12 +209,15 @@ extern "C" {
 	pub fn getptr_ivengineclient() -> * mut IVEngineClient; // MAYBE NULL
 	fn ivengineclient_clientcmd(engine: & mut IVEngineClient, cmd_string: * const c_char);
 	fn ivengineclient_time(engine: &mut IVEngineClient) -> libc::c_float;
-	fn ivengineclient_getlocalplayer(engine: &mut IVEngineClient) -> libc::c_int;
+	fn ivengineclient_getlocalplayer(engine: &IVEngineClient) -> libc::c_int;
 	
 	fn icliententitylist_getcliententity(cliententitylist: *const IClientEntityList, entidx: libc::c_int) -> *mut C_BaseEntity;
 	
 	pub fn getptr_ibaseclientdll() -> * mut IBaseClientDLL; // MAYBE NULL
 	pub fn getptr_icvar(app_sys_factory: * mut AppSysFactory) -> * mut ICvar;
+	
+	fn c_baseentity_getorigin(ent: *const C_BaseEntity) -> Vector;
+	fn c_baseentity_getindex(ent: *const C_BaseEntity) -> libc::c_int;
 	
 	pub fn getptr_cinput(client: *mut IBaseClientDLL) -> *mut CInput;
 	fn icvar_findvar(icvar: * mut ICvar, name: * const char) -> * mut ConVar; // MAYBE NULL;
@@ -201,7 +228,7 @@ extern "C" {
 	
 	pub fn angle_vectors(angle: &QAngle, vec1: *mut Vector, vec2: *mut Vector, vec3: *mut Vector);
 	
-	pub fn ray_t_init(ray: &mut Ray_t, start: &mut Vector, end: &mut Vector);
+	pub fn ray_t_init(ray: &mut Ray_t, start: &Vector, end: &Vector);
 	
 	pub fn create_tracefilter_from_predicate(predicate: extern "C" fn(ent: *const IHandleEntity, contentsmask: i32) -> bool) -> PredicateTraceFilter;
 }
