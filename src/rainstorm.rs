@@ -157,12 +157,12 @@ pub extern "C" fn rainstorm_init(log_fd: libc::c_int, hooked_init_trampoline: *c
 	cheats::cheatmgr_setup();
 	
 	unsafe {
-		let mut ivengineclient_hooker = vmthook::VMTHooker::new((*cheats::CHEAT_MANAGER).get_ivengineclient() as *mut sdk::IVEngineClient as *mut *const ());
-		REAL_INIT = ivengineclient_hooker.get_orig_method(0);
-		REAL_CREATEMOVE = ivengineclient_hooker.get_orig_method(21);
+		let mut ibaseclientdll_hooker = vmthook::VMTHooker::new((*cheats::CHEAT_MANAGER).get_gamepointers().ibaseclientdll as *mut *const ());
+		REAL_INIT = ibaseclientdll_hooker.get_orig_method(0);
+		REAL_CREATEMOVE = ibaseclientdll_hooker.get_orig_method(21);
 		
-		ivengineclient_hooker.hook(0, hooked_init_trampoline);
-		ivengineclient_hooker.hook(21, hooked_createmove_trampoline);
+		ibaseclientdll_hooker.hook(0, hooked_init_trampoline);
+		ibaseclientdll_hooker.hook(21, hooked_createmove_trampoline);
 	}
 	
 	unsafe { CINPUT_PTR = locate_cinput().unwrap() };
