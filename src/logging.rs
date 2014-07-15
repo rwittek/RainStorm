@@ -16,6 +16,15 @@ macro_rules! log(
     })
 )
 
+macro_rules! quit(
+
+	// TODO: could make an oopsie if we have several threads
+    ($($arg:tt)*) => ({
+		log!($($arg)*);
+		libc::exit(1)
+    })
+)
+
 static mut LOGGER: Option<Logger> = None;
 
 struct Logger {

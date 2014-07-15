@@ -23,12 +23,7 @@ mod std {
 	pub use core::fmt; //lol
 }
 
-static mut IVENGINECLIENT_PTR: *mut sdk::IVEngineClient = 0 as *mut sdk::IVEngineClient;
-static mut ICLIENTENTITYLIST_PTR: *mut sdk::IClientEntityList = 0 as *mut sdk::IClientEntityList;
-static mut IBASECLIENTDLL_PTR: *mut sdk::IBaseClientDLL = 0 as *mut sdk::IBaseClientDLL;
-static mut IENGINETRACE_PTR: *mut sdk::IEngineTrace = 0 as *mut sdk::IEngineTrace;
-static mut APPSYSFACTORY_PTR: *mut sdk::AppSysFactory = 0 as *mut sdk::AppSysFactory;
-static mut ICVAR_PTR: *mut sdk::ICvar = 0 as *mut sdk::ICvar;
+
 #[no_mangle]
 pub static mut REAL_INIT: *const () = 0 as *const();
 #[no_mangle]
@@ -106,52 +101,10 @@ pub extern "C" fn rainstorm_process_usercmd(cmd: &mut sdk::CUserCmd) {
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn rainstorm_getivengineclient() -> *mut sdk::IVEngineClient {
-	IVENGINECLIENT_PTR
-}
-#[no_mangle]
 pub extern "C" fn rainstorm_init(log_fd: libc::c_int, hooked_init_trampoline: *const (), hooked_createmove_trampoline: *const ()) {
 	unsafe { let _ = logging::set_fd(log_fd).ok().unwrap(); }
 
-	unsafe {
-		IVENGINECLIENT_PTR = {
-			let engine_ptr = sdk::getptr_ivengineclient();
-			match engine_ptr.is_not_null() {
-				true => { log!("Engine found at {}.\n", engine_ptr); engine_ptr },
-				false => { log!("Engine not found, dying\n");
-					libc::exit(1);
-				}
-			}
-		}
-	};
-	
-	unsafe {IBASECLIENTDLL_PTR = {
-		let ibaseclientdll_ptr = sdk::getptr_ibaseclientdll();
-		match ibaseclientdll_ptr.is_not_null() {
-			true => { log!("IBaseClientDLL found at {}\n", ibaseclientdll_ptr); ibaseclientdll_ptr },
-			false => { log!("IBaseClientDLL not found, dying\n");
-				libc::exit(1);
-			}
-		}
-	}};
-	unsafe {ICLIENTENTITYLIST_PTR = {
-		let icliententitylist_ptr = sdk::getptr_icliententitylist();
-		match icliententitylist_ptr.is_not_null() {
-			true => { log!("IClientEntityList found at {}\n", icliententitylist_ptr); icliententitylist_ptr },
-			false => { log!("IClientEntityList not found, dying\n");
-				libc::exit(1);
-			}
-		}
-	}};
-	unsafe {IENGINETRACE_PTR = {
-		let ienginetrace_ptr = sdk::getptr_ienginetrace();
-		match ienginetrace_ptr.is_not_null() {
-			true => { log!("IEngineTrace found at {}\n", ienginetrace_ptr); ienginetrace_ptr },
-			false => { log!("IEngineTrace not found, dying\n");
-				libc::exit(1);
-			}
-		}
-	}};
+	 
 	unsafe {
 		let mut hooker = vmthook::VMTHooker::new(IBASECLIENTDLL_PTR as *mut *const ());
 		REAL_INIT = hooker.get_orig_method(0);
