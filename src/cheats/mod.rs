@@ -29,14 +29,29 @@ pub trait Cheat {
 }
 
 pub struct CheatManager {
-	cheats: Vec<Box<Cheat>>
+	cheats: Vec<Box<Cheat>>,
+	
+	ivengineclient_ptr: Option<*mut sdk::IVEngineClient>,
+	icliententitylist_ptr: Option<*mut sdk::IClientEntityList>,
+	ibaseclientdll_ptr: Option<*mut sdk::IBaseClientDLL>,
+	ienginetrace_ptr: Option<*mut sdk::IEngineTrace>,
+	appsysfactory_ptr : Option<*mut sdk::AppSysFactory>,
+	icvar_ptr: Option<*mut sdk::ICvar>,
 }
 
 impl CheatManager {
 	pub fn new() -> CheatManager {
 		let triggerbot: Box<triggerbot::Triggerbot> = box Cheat::new();
 		let cvarunlocker: Box<cvarunlocker::CvarUnlocker> = box Cheat::new();
-		let mut mgr = CheatManager { cheats: Vec::new() };
+		
+		let mut mgr = CheatManager { 
+			cheats: Vec::new(),
+			ivengineclient_ptr: None,
+			ibaseclientdll_ptr: None,
+			ienginetrace_ptr: None,
+			appsysfactory_ptr: None,
+			icvar_ptr: None
+		};
 		mgr.cheats.push(cvarunlocker);
 		mgr
 	}

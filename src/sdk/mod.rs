@@ -93,7 +93,7 @@ pub struct Ray_t {
 	data: [u8, ..128] //todo: get proper size
 }
 pub struct PredicateTraceFilter {
-	_vmt_ptr: *const (),
+	_vmt_ptr: *const (), // do NOT mirror in C++
 	predicate: extern "C" fn (*mut IHandleEntity) -> bool
 }
 impl Ray_t {
