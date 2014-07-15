@@ -1,5 +1,6 @@
 use Cheat;
 use CheatManager;
+use GamePointers;
 use sdk;
 use libc;
 use core::prelude::*;
@@ -17,10 +18,10 @@ impl Cheat for Triggerbot {
 	fn get_name<'a>(&'a self) -> &'a str {
 		"Triggerbot"
 	}
-	fn process_usercmd(&mut self, mgr: &CheatManager, cmd: &mut sdk::CUserCmd) {
-		let mut ivengineclient = unsafe { mgr.ivengineclient_ptr.to_option().unwrap() };
-		let mut icliententitylist = unsafe { mgr.icliententitylist_ptr.to_option().unwrap() };
-		let mut ienginetrace = unsafe { mgr.ienginetrace_ptr.to_option().unwrap() };
+	fn process_usercmd(&mut self, ptrs: &GamePointers, cmd: &mut sdk::CUserCmd) {
+		let mut ivengineclient = unsafe { ptrs.ivengineclient.to_option().unwrap() };
+		let mut icliententitylist = unsafe { ptrs.icliententitylist.to_option().unwrap() };
+		let mut ienginetrace = unsafe { ptrs.ienginetrace.to_option().unwrap() };
 		// button 1 = IN_ATTACK
 		if cmd.buttons & 1 == 1 {
 			cmd.buttons = !((!cmd.buttons) | 1); // zero the IN_ATTACK bit
@@ -34,8 +35,8 @@ impl Cheat for Triggerbot {
 }
 
 impl Triggerbot {
-	fn should_shoot(&self, ivengineclient: &mut sdk::IVEngineClient, icliententitylist: &mut sdk::IClientEntityList,
-			ienginetrace: &mut sdk::IEngineTrace, viewangles: &sdk::QAngle) -> bool {
+	fn should_shoot(&self, ivengineclient: &sdk::IVEngineClient, icliententitylist: &sdk::IClientEntityList,
+			ienginetrace: &sdk::IEngineTrace, viewangles: &sdk::QAngle) -> bool {
 		let mut trace = unsafe { sdk::trace_t::new() };
 		//let filter = sdk::create_tracefilter_from_predicate(should_hit_entity);
 

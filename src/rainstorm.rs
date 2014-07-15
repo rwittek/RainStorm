@@ -44,6 +44,56 @@ impl CString {
 	}
 }
 
+#[no_mangle]
+pub extern "C" fn rainstorm_getivengineclient() -> *mut sdk::IVEngineClient {
+	unsafe { (*(cheats::CHEAT_MANAGER)).get_gamepointers().ivengineclient }
+}
+pub struct GamePointers {
+	ivengineclient: *mut sdk::IVEngineClient,
+	icliententitylist: *mut sdk::IClientEntityList,
+	ibaseclientdll: *mut sdk::IBaseClientDLL,
+	ienginetrace: *mut sdk::IEngineTrace,
+	appsysfactory: *mut sdk::AppSysFactory,
+	icvar: *mut sdk::ICvar
+}
+
+impl GamePointers {
+	pub fn load() -> GamePointers {
+		GamePointers {
+			ivengineclient: unsafe {
+				let engine_ptr = sdk::getptr_ivengineclient();
+				match engine_ptr.is_not_null() {
+					true => { log!("Engine found at {}.\n", engine_ptr); engine_ptr },
+					false => { quit!("Engine not found, dying\n") }
+				}
+			},
+			ibaseclientdll: unsafe { 
+				let ibaseclientdll_ptr = sdk::getptr_ibaseclientdll();
+				match ibaseclientdll_ptr.is_not_null() {
+					true => { log!("IBaseClientDLL found at {}\n", ibaseclientdll_ptr); ibaseclientdll_ptr },
+					false => { quit!("IBaseClientDLL not found, dying\n") }
+				}
+			},
+			icliententitylist: unsafe {
+				let icliententitylist_ptr = sdk::getptr_icliententitylist();
+				match icliententitylist_ptr.is_not_null() {
+					true => { log!("IClientEntityList found at {}\n", icliententitylist_ptr); icliententitylist_ptr },
+					false => { quit!("IClientEntityList not found, dying\n") }
+				}
+			},
+			ienginetrace: unsafe {
+				let ienginetrace_ptr = sdk::getptr_ienginetrace();
+				match ienginetrace_ptr.is_not_null() {
+					true => { log!("IEngineTrace found at {}\n", ienginetrace_ptr); ienginetrace_ptr },
+					false => { quit!("IEngineTrace not found, dying\n") }
+				}
+			},
+			appsysfactory: core::ptr::mut_null(),
+			icvar: core::ptr::mut_null()
+		}
+	}
+}
+
 
 pub unsafe fn locate_cinput() -> Option<*mut sdk::CInput> {
 	let start_addr = REAL_CREATEMOVE as *const ();
@@ -105,9 +155,9 @@ pub extern "C" fn rainstorm_init(log_fd: libc::c_int, hooked_init_trampoline: *c
 	cheats::cheatmgr_setup();
 	
 	unsafe {
-		let mut ivengineclient_hooker = vmthook::VMTHooker::new(CHEAT_MANAGER.get_ivengineclient().unwrap() as *mut sdk::IVEngineClient as *mut *const ());
-		ivengineclient_hooker.hook_ivengineclient(0, hooked_init_trampoline);
-		ivengineclient_hooker.hook_ivengineclient(21, hook_createmove_trampoline);
+		let mut ivengineclient_hooker = vmthook::VMTHooker::new((*cheats::CHEAT_MANAGER).get_ivengineclient() as *mut sdk::IVEngineClient as *mut *const ());
+		REAL_INIT = ivengineclient_hooker.hook(0, hooked_init_trampoline);
+		REAL_CREATEMOVE = ivengineclient_hooker.hook(21, hooked_createmove_trampoline);
 	}
 }
 

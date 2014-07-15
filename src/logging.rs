@@ -17,11 +17,9 @@ macro_rules! log(
 )
 
 macro_rules! quit(
-
-	// TODO: could make an oopsie if we have several threads
-    ($($arg:tt)*) => ({
+	($($arg:tt)*) => ({
 		log!($($arg)*);
-		::libc::exit(1)
+		unsafe { ::libc::exit(1) }
     })
 )
 

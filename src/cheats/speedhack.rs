@@ -1,4 +1,4 @@
-use Cheat;
+use {Cheat, CheatManager,  GamePointers};
 use sdk;
 
 pub struct Speedhack;
@@ -10,7 +10,7 @@ impl Cheat for Speedhack {
 	fn get_name<'a>(&'a self) -> &'a str {
 		"Speedhack"
 	}
-	fn process_usercmd(&mut self, cmd: &mut sdk::CUserCmd) {
+	fn process_usercmd(&mut self, ptrs: &GamePointers, cmd: &mut sdk::CUserCmd) {
 		// FIXME: hook input, see which way we want to go
 		// atm, we can't move backwards which is annoying,
 		// and moving sideways gets regular speed
