@@ -478,6 +478,12 @@ JustAfew:
 FILE *logfile;
 
 CreateInterfaceFn AppSysFactory;
+extern "C" void rainstorm_command_cb(const char *arguments);
+void rainstorm_command_cb_trampoline( const CCommand &args ) { rainstorm_command_cb(args.ArgS()); }
+
+ConCommand rainstorm_command("rainstorm", rainstorm_command_cb_trampoline);
+
+
 
 extern "C" CInput *CINPUT_PTR;
 IClientEntityList *ENTLISTPTR;
@@ -581,7 +587,10 @@ extern "C" IEngineTrace * getptr_ienginetrace() {
 }
 
 extern "C" void * getptr_icvar(CreateInterfaceFn unused) {
-	return AppSysFactory( CVAR_INTERFACE_VERSION, NULL );
+	ICvar *ptr = (ICvar *)AppSysFactory( CVAR_INTERFACE_VERSION, NULL );
+	// ewwwww.
+	ptr->RegisterConCommand((ConCommandBase *)&rainstorm_command);
+	return ptr;
 }
 extern "C" IEngineTool * getptr_ienginetool() {
 	return (IEngineTool *) AppSysFactory( VENGINETOOL_INTERFACE_VERSION, NULL );

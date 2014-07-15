@@ -31,6 +31,9 @@ pub trait Cheat {
 	fn preinit(&mut self, ptrs: &GamePointers) {}
 	fn postinit(&mut self, ptrs: &GamePointers) {}
 	fn process_usercmd(&mut self, ptrs: &GamePointers, &mut sdk::CUserCmd) {}
+	
+	fn enable(&mut self) {}
+	fn disable(&mut self) {}
 }
 
 pub struct CheatManager {
@@ -45,6 +48,7 @@ impl CheatManager {
 	pub fn new() -> CheatManager {
 		let triggerbot: Box<triggerbot::Triggerbot> = box Cheat::new();
 		let cvarunlocker: Box<cvarunlocker::CvarUnlocker> = box Cheat::new();
+		let cvarunlocker: Box<speedhack::Speedhack> = box Cheat::new();
 		
 		let mut mgr = CheatManager { 
 			cheats: Vec::new(),
@@ -54,9 +58,32 @@ impl CheatManager {
 
 		mgr.cheats.push(cvarunlocker);
 		mgr.cheats.push(triggerbot);
+		mgr.cheats.push(speedhack);
 		mgr
 	}
-	
+	pub fn handle_command(&mut self, command: &str, arguments: Vec<&str>) {
+		log!("handling command {}\n", command);
+		match command {
+			"enable_cheat" => {
+				let cheat_name = arguments.get(0);
+				match self.cheats.mut_iter().find(|cheat| cheat.get_name() == *cheat_name) {
+					Some(mut cheat) => cheat.enable(),
+					None => log!("Could not find any cheats named {}\n", *cheat_name) // cheat not found
+				}
+			},
+			"disable_cheat" => {
+				let cheat_name = arguments.get(0);
+				match self.cheats.mut_iter().find(|cheat| cheat.get_name() == *cheat_name) {
+					Some(mut cheat) => cheat.disable(),
+					None => log!("Could not find any cheats named {}\n", *cheat_name) // cheat not found
+				}
+			},
+			_ => {
+				log!("Unrecognized command {}\n", {});
+				// unrecognized
+			}
+		}
+	}
 	// Wrappers that run all the cheats' methods
 	pub fn preinit(&mut self, appsysfactory: *mut sdk::AppSysFactory) {
 		self.ptrs.appsysfactory = appsysfactory;

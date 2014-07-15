@@ -1,11 +1,13 @@
 use {Cheat, CheatManager,  GamePointers};
 use sdk;
 
-pub struct Speedhack;
+pub struct Speedhack {
+	enabled: bool
+}
 
 impl Cheat for Speedhack {
 	fn new() -> Speedhack {
-		Speedhack
+		Speedhack { enabled: false }
 	}
 	fn get_name<'a>(&'a self) -> &'a str {
 		"Speedhack"
@@ -23,4 +25,7 @@ impl Cheat for Speedhack {
 			cmd.viewangles.roll= 49f32; // capped at 50 by server
 		}
 	}
+	
+	fn enable(&mut self) { self.enabled = true; }
+	fn disable(&mut self) { self.enabled = false; }
 }

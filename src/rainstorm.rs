@@ -148,6 +148,21 @@ pub extern "C" fn rainstorm_process_usercmd(cmd: &mut sdk::CUserCmd) {
 		};
 	}
 }
+#[no_mangle]
+pub extern "C" fn rainstorm_command_cb(c_arguments: *const libc::c_char) {
+	let arguments_str = unsafe { core::str::raw::c_str_to_static_slice(c_arguments) };
+	log!("Command callback: {}\n", arguments_str);
+	
+	let mut parts_iter = arguments_str.split(' ');
+	let command = parts_iter.next().unwrap();
+	let parts: collections::Vec<&str> = parts_iter.collect();
+	
+	unsafe {
+		if cheats::CHEAT_MANAGER.is_not_null() {
+			(*cheats::CHEAT_MANAGER).handle_command(command, parts);
+		}
+	}
+}
 
 #[no_mangle]
 pub extern "C" fn rainstorm_init(log_fd: libc::c_int, hooked_init_trampoline: *const (), hooked_createmove_trampoline: *const ()) {
