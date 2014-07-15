@@ -6,7 +6,6 @@ use core::iter::Iterator;
 use core::prelude::*;
 use alloc;
 use core;
-use vmthook;
 use GamePointers;
 
 pub mod triggerbot;
@@ -17,10 +16,10 @@ pub static mut CHEAT_MANAGER: *mut CheatManager = 0 as *mut CheatManager;
 
 pub fn cheatmgr_setup() {
 	unsafe {
+		log!("Allocating memory for CHEAT_MANAGER\n");
 		CHEAT_MANAGER = alloc::heap::allocate(core::mem::size_of::<CheatManager>(), 8) as *mut CheatManager;
+		log!("Constructing CHEAT_MANAGER\n");
 		core::ptr::write(CHEAT_MANAGER, CheatManager::new());
-		
-		let mut ivengineclient_hooker = vmthook::VMTHooker::new((*CHEAT_MANAGER).get_ivengineclient() as *mut sdk::IVEngineClient as *mut *const ());
 	}
 	
 }
@@ -54,6 +53,7 @@ impl CheatManager {
 		};
 
 		mgr.cheats.push(cvarunlocker);
+		mgr.cheats.push(triggerbot);
 		mgr
 	}
 	

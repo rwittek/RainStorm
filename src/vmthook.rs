@@ -40,10 +40,9 @@ impl VMTHooker {
 		hooker
 	}
 	
-	pub unsafe fn hook(&mut self, offset: uint, hook: *const ()) -> *const () {
-		log!("Patching VMT {} offset {} with {}.\n", self.patched_vmt_ptr, offset, hook);
+	pub unsafe fn hook(&mut self, offset: uint, hook: *const ()) {
+		log!("Patching VMT {} offset {} with {} (was: {})\n", self.patched_vmt_ptr, offset, hook, (*(self.patched_vmt_ptr))[offset]);
 		(*(self.patched_vmt_ptr))[offset] = hook;
-		self.original_vmt[offset]
 	}
 	
 	pub unsafe fn get_orig_method(&self, offset: uint) -> *const () {

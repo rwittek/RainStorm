@@ -97,14 +97,17 @@ impl GamePointers {
 
 pub unsafe fn locate_cinput() -> Option<*mut sdk::CInput> {
 	let start_addr = REAL_CREATEMOVE as *const ();
-	let result = utils::search_memory(start_addr, 100, &[0x8Bu8, 0x0D]);
-	
+	log!("Locating CInput from CreateMove at {}\n", start_addr);
+	let result = utils::search_memory(start_addr, 100, &[0x8B, 0x0D]);
+	//let result = utils::search_memory(((result1 as uint) + 2) as *const (), 100, &[0x8B, 0x0D]);
 	match result {
 		Some(ptr) => {
-			let cinput_ptr_ptr = *(((ptr as uint) + 2) as *const *const *mut sdk::CInput);
-			log!("CInput pointer found at {}\n", cinput_ptr_ptr);
+			let load_instruction_operand = (((ptr as uint) + 2) as *const *const *mut sdk::CInput);
+			log!("CInput load found at {}\n", load_instruction_operand); 
+			let cinput_ptr_ptr = *load_instruction_operand;
+			log!("CInput pointer: {}\n", cinput_ptr_ptr);
 			log!("CInput found at {}\n", *cinput_ptr_ptr);
-			Some(*(cinput_ptr_ptr))
+			Some((*cinput_ptr_ptr))
 		},
 		None => {
 			log!("CInput not found?!?\n");
@@ -149,16 +152,20 @@ pub extern "C" fn rainstorm_process_usercmd(cmd: &mut sdk::CUserCmd) {
 #[no_mangle]
 pub extern "C" fn rainstorm_init(log_fd: libc::c_int, hooked_init_trampoline: *const (), hooked_createmove_trampoline: *const ()) {
 	unsafe { let _ = logging::set_fd(log_fd).ok().unwrap(); }
-	
-	unsafe { CINPUT_PTR = locate_cinput().unwrap() };
-		
+	log!("Rainstorm starting up!");
+
 	cheats::cheatmgr_setup();
 	
 	unsafe {
 		let mut ivengineclient_hooker = vmthook::VMTHooker::new((*cheats::CHEAT_MANAGER).get_ivengineclient() as *mut sdk::IVEngineClient as *mut *const ());
-		REAL_INIT = ivengineclient_hooker.hook(0, hooked_init_trampoline);
-		REAL_CREATEMOVE = ivengineclient_hooker.hook(21, hooked_createmove_trampoline);
+		REAL_INIT = ivengineclient_hooker.get_orig_method(0);
+		REAL_CREATEMOVE = ivengineclient_hooker.get_orig_method(21);
+		
+		ivengineclient_hooker.hook(0, hooked_init_trampoline);
+		ivengineclient_hooker.hook(21, hooked_createmove_trampoline);
 	}
+	
+	unsafe { CINPUT_PTR = locate_cinput().unwrap() };
 }
 
 #[lang = "stack_exhausted"] extern fn stack_exhausted() {}
