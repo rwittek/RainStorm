@@ -8,7 +8,7 @@ extern crate collections;
 
 pub use core::prelude::*;
 pub use core::result::{Result, Ok, Err};
-pub use cheats::Cheat;
+pub use cheats::{Cheat, CheatManager};
 pub use alloc::owned::Box;
 use core::raw::Repr;
 
@@ -65,15 +65,11 @@ pub unsafe fn locate_cinput() -> Option<*mut sdk::CInput> {
 #[no_mangle]
 pub unsafe extern "C" fn rainstorm_preinithook(app_sys_factory: *mut sdk::AppSysFactory, _physics_factory: *mut sdk::PhysicsFactory, _globals: *mut sdk::Globals) {
 	log!("pre-init hook running\n");
-	// TODO: null check
-	APPSYSFACTORY_PTR = app_sys_factory;
-	ICVAR_PTR = sdk::getptr_icvar(app_sys_factory);
 
 	if cheats::CHEAT_MANAGER.is_not_null() {
-		(*cheats::CHEAT_MANAGER).preinit();
+		(*cheats::CHEAT_MANAGER).preinit(app_sys_factory);
 	} else {
-		log!("Cheat manager not found!\n");
-		libc::exit(1);
+		quit!("Cheat manager not found!\n");
 	};
 }
 
@@ -103,21 +99,16 @@ pub extern "C" fn rainstorm_process_usercmd(cmd: &mut sdk::CUserCmd) {
 #[no_mangle]
 pub extern "C" fn rainstorm_init(log_fd: libc::c_int, hooked_init_trampoline: *const (), hooked_createmove_trampoline: *const ()) {
 	unsafe { let _ = logging::set_fd(log_fd).ok().unwrap(); }
-
-	 
-	unsafe {
-		let mut hooker = vmthook::VMTHooker::new(IBASECLIENTDLL_PTR as *mut *const ());
-		REAL_INIT = hooker.get_orig_method(0);
-		REAL_CREATEMOVE = hooker.get_orig_method(21);
-		hooker.hook(0, hooked_init_trampoline);
-		hooker.hook(21, hooked_createmove_trampoline);
-		log!("Hooks installed.\n");
-		//engine.ClientCmd("say hello world");
-	};
 	
 	unsafe { CINPUT_PTR = locate_cinput().unwrap() };
 		
 	cheats::cheatmgr_setup();
+	
+	unsafe {
+		let mut ivengineclient_hooker = vmthook::VMTHooker::new(CHEAT_MANAGER.get_ivengineclient().unwrap() as *mut sdk::IVEngineClient as *mut *const ());
+		ivengineclient_hooker.hook_ivengineclient(0, hooked_init_trampoline);
+		ivengineclient_hooker.hook_ivengineclient(21, hook_createmove_trampoline);
+	}
 }
 
 #[lang = "stack_exhausted"] extern fn stack_exhausted() {}

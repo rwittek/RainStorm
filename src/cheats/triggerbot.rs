@@ -1,4 +1,5 @@
 use Cheat;
+use CheatManager;
 use sdk;
 use libc;
 use core::prelude::*;
@@ -16,13 +17,15 @@ impl Cheat for Triggerbot {
 	fn get_name<'a>(&'a self) -> &'a str {
 		"Triggerbot"
 	}
-	fn process_usercmd(&mut self, cmd: &mut sdk::CUserCmd) {
-		// TODO: move trace_to_player into Triggerbot
+	fn process_usercmd(&mut self, mgr: &CheatManager, cmd: &mut sdk::CUserCmd) {
+		let mut ivengineclient = unsafe { mgr.ivengineclient_ptr.to_option().unwrap() };
+		let mut icliententitylist = unsafe { mgr.icliententitylist_ptr.to_option().unwrap() };
+		let mut ienginetrace = unsafe { mgr.ienginetrace_ptr.to_option().unwrap() };
 		// button 1 = IN_ATTACK
 		if cmd.buttons & 1 == 1 {
 			cmd.buttons = !((!cmd.buttons) | 1); // zero the IN_ATTACK bit
 			unsafe {
-				if self.should_shoot(&cmd.viewangles) {
+				if self.should_shoot(ivengineclient, icliententitylist, ienginetrace, &cmd.viewangles) {
 						cmd.buttons = cmd.buttons | 1;
 				}
 			}
@@ -31,12 +34,13 @@ impl Cheat for Triggerbot {
 }
 
 impl Triggerbot {
-	fn should_shoot(&self, viewangles: &sdk::QAngle) -> bool {
+	fn should_shoot(&self, ivengineclient: &mut sdk::IVEngineClient, icliententitylist: &mut sdk::IClientEntityList,
+			ienginetrace: &mut sdk::IEngineTrace, viewangles: &sdk::QAngle) -> bool {
 		let mut trace = unsafe { sdk::trace_t::new() };
 		//let filter = sdk::create_tracefilter_from_predicate(should_hit_entity);
 
-		let localplayer_entidx = unsafe { ::IVENGINECLIENT_PTR.to_option().unwrap().get_local_player() };
-		let local_baseentity = unsafe { ::ICLIENTENTITYLIST_PTR.to_option().unwrap().get_client_entity(localplayer_entidx) };
+		let localplayer_entidx = ivengineclient.get_local_player();
+		let local_baseentity = icliententitylist.get_client_entity(localplayer_entidx);
 		
 		let me: &mut sdk::C_BaseEntity = if local_baseentity.is_not_null() {
 			unsafe { core::mem::transmute(local_baseentity) }
@@ -61,7 +65,7 @@ impl Triggerbot {
 		
 		let ray = sdk::Ray_t::new(&eyes, &direction);
 
-		unsafe { ::IENGINETRACE_PTR.to_option().unwrap().trace_ray(&ray, 0x46004001, None, &mut trace); }
+		ienginetrace.trace_ray(&ray, 0x46004001, None, &mut trace);
 		if ( trace.base.allsolid ) {
 			return false;
 		}
