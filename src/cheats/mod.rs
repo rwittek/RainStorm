@@ -48,7 +48,7 @@ impl CheatManager {
 	pub fn new() -> CheatManager {
 		let triggerbot: Box<triggerbot::Triggerbot> = box Cheat::new();
 		let cvarunlocker: Box<cvarunlocker::CvarUnlocker> = box Cheat::new();
-		let cvarunlocker: Box<speedhack::Speedhack> = box Cheat::new();
+		let speedhack: Box<speedhack::Speedhack> = box Cheat::new();
 		
 		let mut mgr = CheatManager { 
 			cheats: Vec::new(),
