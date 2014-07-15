@@ -13,6 +13,10 @@ impl Cheat for Speedhack {
 		"Speedhack"
 	}
 	fn process_usercmd(&mut self, ptrs: &GamePointers, cmd: &mut sdk::CUserCmd) {
+		if !self.enabled {
+			return;
+		}
+		
 		// FIXME: hook input, see which way we want to go
 		// atm, we can't move backwards which is annoying,
 		// and moving sideways gets regular speed

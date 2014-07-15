@@ -47,3 +47,4 @@ target/rainstorm.exp
 libs/*
 libc.lib
 wrapper.lib
+target/rainstorm.lib
