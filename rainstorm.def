@@ -1,0 +1,3 @@
+LIBRARY rainstorm.dll
+EXPORTS
+	DllMain @1

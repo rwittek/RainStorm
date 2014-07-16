@@ -7,7 +7,10 @@ use core::prelude::*;
 use core;
 
 pub struct Triggerbot {
-	enabled: bool
+	enabled: bool,
+	
+	smoothing: u32,
+	smoothing_state: u32
 }
 
 extern "C" fn should_hit_entity(ent: *const sdk::IHandleEntity, contentsmask: i32) -> bool {
@@ -15,7 +18,7 @@ extern "C" fn should_hit_entity(ent: *const sdk::IHandleEntity, contentsmask: i3
 }
 impl Cheat for Triggerbot {
 	fn new() -> Triggerbot {
-		Triggerbot { enabled: false }
+		Triggerbot { enabled: false, smoothing: 0, smoothing_state: 0 }
 	}
 	fn get_name<'a>(&'a self) -> &'a str {
 		"Triggerbot"
@@ -33,13 +36,29 @@ impl Cheat for Triggerbot {
 			cmd.buttons = !((!cmd.buttons) | 1); // zero the IN_ATTACK bit
 			unsafe {
 				if self.should_shoot(ivengineclient, icliententitylist, ienginetrace, &cmd.viewangles) {
+					self.smoothing_state = self.smoothing_state + 1;
+					if self.smoothing_state > self.smoothing {
 						cmd.buttons = cmd.buttons | 1;
+					}
+				} else {
+					if self.smoothing_state > 0 {
+						self.smoothing_state = self.smoothing_state - 1;
+					}
 				}
 			}
 		}
 	}
 	fn enable(&mut self) { self.enabled = true; }
 	fn disable(&mut self) { self.enabled = false; }
+	fn set_config(&mut self, var: &str, val: &[&str]) {
+		match var {
+			"smoothing" => {
+				self.smoothing = ::utils::str_to_integral(val[0]);
+				log!("Smoothing: {}\n", self.smoothing);
+			},
+			_ => {}
+		}
+	}
 }
 
 impl Triggerbot {

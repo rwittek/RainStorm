@@ -35,7 +35,7 @@ pub trait Cheat {
 	fn enable(&mut self) {}
 	fn disable(&mut self) {}
 	
-	fn set_config(&mut self, args: &[&str]) {}
+	fn set_config(&mut self, var: &str, val: &[&str]) {}
 }
 
 pub struct CheatManager {
@@ -83,7 +83,7 @@ impl CheatManager {
 			"config" => {
 				let cheat_name = arguments[0];
 				match self.cheats.mut_iter().find(|cheat| cheat.get_name() == cheat_name) {
-					Some(mut cheat) => cheat.set_config(arguments.slice_from(1)),
+					Some(mut cheat) => cheat.set_config(arguments[1], arguments.slice_from(2)),
 					None => log!("Could not find any cheats named {}\n", cheat_name) // cheat not found
 				}
 			},

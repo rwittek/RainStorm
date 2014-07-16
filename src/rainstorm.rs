@@ -16,7 +16,7 @@ use core::raw::Repr;
 pub mod sdk;
 mod logging;
 mod vmthook;
-mod utils;
+pub mod utils;
 mod cheats;
 
 mod std {
