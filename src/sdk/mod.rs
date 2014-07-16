@@ -113,6 +113,9 @@ impl C_BaseEntity {
 	pub fn get_index(&self) -> libc::c_int {
 		unsafe { c_baseentity_getindex(self) }
 	}
+	pub unsafe fn ptr_offset<DataType>(&mut self, offset: uint) -> *mut DataType {
+		(((self as *mut C_BaseEntity as uint) + offset) as *mut DataType)
+	}
 }
 		
 impl trace_t {

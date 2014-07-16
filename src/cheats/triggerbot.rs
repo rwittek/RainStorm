@@ -65,10 +65,10 @@ impl Triggerbot {
 		let mut eyes = me.get_origin();
 		
 		unsafe {
-			let eye_offsets = ((me as *mut sdk::C_BaseEntity as uint) + 0xF8) as *const [f32, ..3];
-			eyes.x += (*eye_offsets)[0];
-			eyes.y += (*eye_offsets)[1];
-			eyes.z += (*eye_offsets)[2];
+			let eye_offsets: [f32, ..3] = *(me.ptr_offset(0xF8));
+			eyes.x += (eye_offsets)[0];
+			eyes.y += (eye_offsets)[1];
+			eyes.z += (eye_offsets)[2];
 		}
 		direction = direction.scale( 8192.0f32 ) + eyes;
 		
@@ -85,7 +85,7 @@ impl Triggerbot {
 			//log!("Hit entity {} at hitgroup {}\n", entidx, unsafe { sdk::trace_t_gethitgroup(&trace)});
 			if (trace.hitgroup ==  1) && 
 					unsafe {
-						((*(((trace.ent as uint)+0x00AC) as *const i32)) != (*(((me as *mut sdk::C_BaseEntity as uint)+0x00AC) as *const i32)))
+						*((*trace.ent).ptr_offset::<u32>(0x00AC)) != *(me.ptr_offset(0x00AC))
 					}
 			{
 				return true;
