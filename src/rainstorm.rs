@@ -159,7 +159,7 @@ pub extern "C" fn rainstorm_command_cb(c_arguments: *const libc::c_char) {
 	
 	unsafe {
 		if cheats::CHEAT_MANAGER.is_not_null() {
-			(*cheats::CHEAT_MANAGER).handle_command(command, parts);
+			(*cheats::CHEAT_MANAGER).handle_command(command, parts.as_slice());
 		}
 	}
 }

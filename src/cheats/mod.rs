@@ -34,6 +34,8 @@ pub trait Cheat {
 	
 	fn enable(&mut self) {}
 	fn disable(&mut self) {}
+	
+	fn set_config(&mut self, args: &[&str]) {}
 }
 
 pub struct CheatManager {
@@ -61,21 +63,28 @@ impl CheatManager {
 		mgr.cheats.push(speedhack);
 		mgr
 	}
-	pub fn handle_command(&mut self, command: &str, arguments: Vec<&str>) {
+	pub fn handle_command(&mut self, command: &str, arguments: &[&str]) {
 		log!("handling command {}\n", command);
 		match command {
 			"enable_cheat" => {
-				let cheat_name = arguments.get(0);
-				match self.cheats.mut_iter().find(|cheat| cheat.get_name() == *cheat_name) {
+				let cheat_name = arguments[0];
+				match self.cheats.mut_iter().find(|cheat| cheat.get_name() == cheat_name) {
 					Some(mut cheat) => cheat.enable(),
-					None => log!("Could not find any cheats named {}\n", *cheat_name) // cheat not found
+					None => log!("Could not find any cheats named {}\n", cheat_name) // cheat not found
 				}
 			},
 			"disable_cheat" => {
-				let cheat_name = arguments.get(0);
-				match self.cheats.mut_iter().find(|cheat| cheat.get_name() == *cheat_name) {
+				let cheat_name = arguments[0];
+				match self.cheats.mut_iter().find(|cheat| cheat.get_name() == cheat_name) {
 					Some(mut cheat) => cheat.disable(),
-					None => log!("Could not find any cheats named {}\n", *cheat_name) // cheat not found
+					None => log!("Could not find any cheats named {}\n", cheat_name) // cheat not found
+				}
+			},
+			"config" => {
+				let cheat_name = arguments[0];
+				match self.cheats.mut_iter().find(|cheat| cheat.get_name() == cheat_name) {
+					Some(mut cheat) => cheat.set_config(arguments.slice_from(1)),
+					None => log!("Could not find any cheats named {}\n", cheat_name) // cheat not found
 				}
 			},
 			_ => {
