@@ -26,7 +26,7 @@ impl Cheat for Speedhack {
 			
 			cmd.viewangles.pitch = 89f32;
 			cmd.viewangles.yaw = (cmd.viewangles.yaw + 180f32) % 360f32; // flip us around
-			cmd.viewangles.roll= 49f32; // capped at 50 by server
+			cmd.viewangles.roll= 90f32; // apparently not capped, ggnore
 		}
 	}
 	
