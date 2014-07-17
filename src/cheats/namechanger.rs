@@ -9,12 +9,13 @@ use core::raw::Repr;
 
 pub struct NameChanger {
 	enabled: bool,
-	rng: ::rand::isaac::IsaacRng
+	rng: ::rand::isaac::IsaacRng,
+	last_victim: i32
 }
 
 impl Cheat for NameChanger {
 	fn new() -> NameChanger {
-		NameChanger { enabled: false, rng: ::rand::isaac::IsaacRng::new_unseeded() }
+		NameChanger { enabled: false, rng: ::rand::isaac::IsaacRng::new_unseeded(), last_victim: -1 }
 	}
 	fn get_name<'a>(&'a self) -> &'a str {
 		"NameChanger"
@@ -59,7 +60,9 @@ impl Cheat for NameChanger {
 			//log!("player named {}\n", str_name);
 			if unsafe { *((*ptr).ptr_offset::<u32>(0x00AC)) == *(me.ptr_offset::<u32>(0x00AC)) } {
 				// teammates
-				names.push(buf);
+				if unsafe { (*ptr).get_index() != me.get_index() && (*ptr).get_index() != self.last_victim } {
+					names.push(buf);
+				}
 			}
 		});
 		
@@ -69,12 +72,12 @@ impl Cheat for NameChanger {
 			Some(new_name) => {
 				let namevar = icvar.find_var("name");
 				match namevar {
-					Some(name) => unsafe { (*name).setvalue_raw(::sdk::Str(::CString::new_raw(new_name.as_slice().repr().data as *const u8))); log!("name changed OK :U\n") },
+					Some(name) => unsafe { (*name).setvalue_raw(::sdk::Str(::CString::new_raw(new_name.as_slice().repr().data as *const u8))) },
 					None => {log!("No name CVar? u wot m8\n"); unsafe { libc::exit(1); }}
 				}
 			},
 			None => {
-				quit!("no name cvar?\n");
+				// nobody else on server?
 			}
 		}
 	}
