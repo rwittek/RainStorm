@@ -57,8 +57,8 @@ impl Cheat for NameChanger {
 			
 			let str_name = ::core::str::from_utf8(buf.as_slice());
 			//log!("player named {}\n", str_name);
-			if unsafe { *((*ptr).ptr_offset::<u32>(0x00AC)) != *(me.ptr_offset::<u32>(0x00AC)) } {
-				// different teams
+			if unsafe { *((*ptr).ptr_offset::<u32>(0x00AC)) == *(me.ptr_offset::<u32>(0x00AC)) } {
+				// teammates
 				names.push(buf);
 			}
 		});

@@ -5,11 +5,13 @@ extern crate libc;
 extern crate core;
 extern crate alloc;
 extern crate collections;
+extern crate rand;
 
 pub use core::prelude::*;
 pub use core::result::{Result, Ok, Err};
 pub use cheats::{Cheat, CheatManager};
 pub use alloc::owned::Box;
+pub use collections::Vec;
 use core::raw::Repr;
 
 
@@ -34,13 +36,16 @@ pub static mut CINPUT_PTR: *mut sdk::CInput = 0 as *mut sdk::CInput;
 struct CString(*const libc::c_char);
 
 impl CString {
-	pub fn new(src: &'static str) -> Option<CString> {
+	pub fn new(src: &'static [u8]) -> Option<CString> {
 		let slice = src.repr();
 		if unsafe { *((slice.data as uint + (slice.len - 1)) as *const u8) == 0 } {
 			Some(CString(slice.data as *const libc::c_char))
 		} else {
 			None
 		}
+	}
+	pub unsafe fn new_raw(src: *const u8) -> CString {
+		CString(src as *const libc::c_char)
 	}
 }
 
