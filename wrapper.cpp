@@ -626,8 +626,11 @@ void convar_restore( IConVar* ivar, const char* pOldValue, float flOldValue ) {
 	//else var->InternalSetFloatValue(flOldValue);
 }
 
-extern "C" void convar_freeze(ConVar *cvar) {
-	cvar->m_fnChangeCallback = convar_restore;
+extern "C" void convar_changeandfreeze(ConVar *cvar, const char *newval) {
+	//auto oldcb = cvar->m_fnChangeCallback;
+	cvar->m_fnChangeCallback = NULL;
+	cvar->InternalSetValue(newval);
+	cvar->m_fnChangeCallback = NULL;
 }
 
 
@@ -660,7 +663,15 @@ extern "C" Vector c_baseentity_getorigin(C_BaseEntity *ent) {
 extern "C" int c_baseentity_getindex(C_BaseEntity *ent) {
 	return ent->index;
 }
-
+extern "C" size_t ivengineclient_getplayername(IVEngineClient *eng, C_BaseEntity *ent, char *buf, size_t bufsize) {
+	player_info_t info;
+	if (eng->GetPlayerInfo(ent->index, &info)) {
+		strncpy(buf, info.name, strlen(info.name));
+		return strlen(info.name);
+	}
+	//buf[0] = 0;
+	return 0;
+}
 extern "C" void ienginetrace_traceray(IEngineTrace *enginetrace, const Ray_t &ray, unsigned int fMask, ITraceFilter *pTraceFilter, trace_t *pTrace ) {
 	enginetrace->TraceRay(ray, fMask, pTraceFilter, pTrace);
 }

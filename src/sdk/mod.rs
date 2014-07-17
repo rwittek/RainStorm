@@ -154,6 +154,11 @@ impl IVEngineClient {
 	pub fn get_local_player(&self) -> libc::c_int {
 		unsafe { ivengineclient_getlocalplayer(self) }
 	}
+	pub fn get_player_name(&self, ent: &C_BaseEntity, buf: &mut [u8]) -> u32 {
+		unsafe {
+			ivengineclient_getplayername(self, ent, buf.repr().data as *mut u8, buf.repr().len as u32)
+		}
+	}
 }
 impl IClientEntityList {
 	pub fn get_client_entity(&self, entidx: libc::c_int) -> *mut C_BaseEntity {
@@ -187,8 +192,8 @@ impl ConVar {
 			Str(s) => convar_setvalue_str(self as *mut ConVar, s)
 		}
 	}
-	pub unsafe fn freeze(&mut self) {
-		convar_freeze(self as *mut ConVar)
+	pub unsafe fn changeandfreeze(&mut self, newval: CString) {
+		convar_changeandfreeze(self as *mut ConVar, newval)
 	}
 	pub unsafe fn clearflags(&mut self) {
 		convar_clearflags(self as *mut ConVar)
@@ -217,7 +222,7 @@ extern "C" {
 	fn ivengineclient_clientcmd(engine: & mut IVEngineClient, cmd_string: * const c_char);
 	fn ivengineclient_time(engine: &mut IVEngineClient) -> libc::c_float;
 	fn ivengineclient_getlocalplayer(engine: &IVEngineClient) -> libc::c_int;
-	
+	fn ivengineclient_getplayername(eng: *const IVEngineClient, ent: *const C_BaseEntity, buf: *mut u8, bufsize: libc::size_t) -> libc::size_t;
 	pub fn getptr_ienginetrace() -> * mut IEngineTrace; // MAYBE NULL
 	fn ienginetrace_traceray(enginetrace: &IEngineTrace, ray: &Ray_t, mask: u32, filter: *mut IEngineTrace, trace: &mut trace_t);
 	
@@ -236,7 +241,7 @@ extern "C" {
 	pub fn convar_setvalue_raw_int(cvar: * mut ConVar, value: libc::c_int);
 	pub fn convar_setvalue_str(cvar: * mut ConVar, value: CString);
 	pub fn convar_clearflags(cvar: * mut ConVar);
-	pub fn convar_freeze(cvar: * mut ConVar);
+	pub fn convar_changeandfreeze(cvar: * mut ConVar, newval: CString);
 	
 	pub fn angle_vectors(angle: &QAngle, vec1: *mut Vector, vec2: *mut Vector, vec3: *mut Vector);
 	

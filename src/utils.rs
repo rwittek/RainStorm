@@ -28,3 +28,17 @@ pub fn str_to_integral<T: ::core::num::Int + ::core::num::FromPrimitive>(string:
 	
 	n
 }
+
+pub fn map_all_players(entlist_ptr: *mut ::sdk::IClientEntityList, f: |*mut ::sdk::C_BaseEntity|) {
+	match unsafe { entlist_ptr.to_option() } {
+		Some(entlist) => {
+			for idx in range(1i32, 32) {
+				let maybe_ent_ptr = entlist.get_client_entity(idx);
+				if maybe_ent_ptr.is_not_null() {
+					f(maybe_ent_ptr)
+				}
+			}
+		},
+		None => ()
+	}
+}
