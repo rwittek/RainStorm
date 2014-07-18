@@ -27,7 +27,7 @@ impl Cheat for NameChanger {
 			None => {log!("No name CVar? u wot m8\n"); unsafe { libc::exit(1); }}
 		}
 	}
-	fn process_usercmd(&mut self, ptrs: &GamePointers, cmd: &mut sdk::CUserCmd) {
+	fn process_usercmd(&mut self, ptrs: &GamePointers, _cmd: &mut sdk::CUserCmd) {
 		if !self.enabled {
 			return;
 		}

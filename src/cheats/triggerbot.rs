@@ -34,16 +34,15 @@ impl Cheat for Triggerbot {
 		// button 1 = IN_ATTACK
 		if cmd.buttons & 1 == 1 {
 			cmd.buttons = !((!cmd.buttons) | 1); // zero the IN_ATTACK bit
-			unsafe {
-				if self.should_shoot(ivengineclient, icliententitylist, ienginetrace, &cmd.viewangles) {
-					self.smoothing_state = self.smoothing_state + 1;
-					if self.smoothing_state > self.smoothing {
-						cmd.buttons = cmd.buttons | 1;
-					}
-				} else {
-					if self.smoothing_state > 0 {
-						self.smoothing_state = self.smoothing_state - 1;
-					}
+			
+			if self.should_shoot(ivengineclient, icliententitylist, ienginetrace, &cmd.viewangles) {
+				self.smoothing_state = self.smoothing_state + 1;
+				if self.smoothing_state > self.smoothing {
+					cmd.buttons = cmd.buttons | 1; // set IN_ATTACK
+				}
+			} else {
+				if self.smoothing_state > 0 {
+					self.smoothing_state = self.smoothing_state - 1;
 				}
 			}
 		}
