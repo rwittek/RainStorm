@@ -183,8 +183,11 @@ pub extern "C" fn rainstorm_init(log_fd: libc::c_int, hooked_init_trampoline: *c
 		
 		ibaseclientdll_hooker.hook(0, hooked_init_trampoline);
 		ibaseclientdll_hooker.hook(21, hooked_createmove_trampoline);
-	}
+		
+		ibaseclientdll_hooker
+	};
 	
+
 	unsafe { CINPUT_PTR = locate_cinput().unwrap() };
 }
 
