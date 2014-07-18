@@ -2,7 +2,6 @@ use core::prelude::*;
 use Cheat;
 use sdk;
 use libc;
-use CheatManager;
 use GamePointers;
 
 pub struct CvarUnlocker;

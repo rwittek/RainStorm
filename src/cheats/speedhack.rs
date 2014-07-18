@@ -1,4 +1,4 @@
-use {Cheat, CheatManager,  GamePointers};
+use {Cheat, GamePointers};
 use sdk;
 
 pub struct Speedhack {

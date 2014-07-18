@@ -1,7 +1,6 @@
 use sdk;
 use alloc::owned::Box;
 use collections::Vec;
-use {Option, Some, None};
 use core::iter::Iterator;
 use core::prelude::*;
 use alloc;
@@ -29,13 +28,19 @@ pub trait Cheat {
 	fn new() -> Self;
 	fn get_name<'a>(&'a self) -> &'a str;
 	
+	#[allow(unused_variable)]
 	fn preinit(&mut self, ptrs: &GamePointers) {}
+	#[allow(unused_variable)]
 	fn postinit(&mut self, ptrs: &GamePointers) {}
+	#[allow(unused_variable)]
 	fn process_usercmd(&mut self, ptrs: &GamePointers, &mut sdk::CUserCmd) {}
 	
+	#[allow(unused_variable)]
 	fn enable(&mut self) {}
+	#[allow(unused_variable)]
 	fn disable(&mut self) {}
 	
+	#[allow(unused_variable)]
 	fn set_config(&mut self, var: &str, val: &[&str]) {}
 }
 
@@ -72,21 +77,21 @@ impl CheatManager {
 			"enable_cheat" => {
 				let cheat_name = arguments[0];
 				match self.cheats.mut_iter().find(|cheat| cheat.get_name() == cheat_name) {
-					Some(mut cheat) => cheat.enable(),
+					Some(cheat) => cheat.enable(),
 					None => log!("Could not find any cheats named {}\n", cheat_name) // cheat not found
 				}
 			},
 			"disable_cheat" => {
 				let cheat_name = arguments[0];
 				match self.cheats.mut_iter().find(|cheat| cheat.get_name() == cheat_name) {
-					Some(mut cheat) => cheat.disable(),
+					Some(cheat) => cheat.disable(),
 					None => log!("Could not find any cheats named {}\n", cheat_name) // cheat not found
 				}
 			},
 			"config" => {
 				let cheat_name = arguments[0];
 				match self.cheats.mut_iter().find(|cheat| cheat.get_name() == cheat_name) {
-					Some(mut cheat) => cheat.set_config(arguments[1], arguments.slice_from(2)),
+					Some(cheat) => cheat.set_config(arguments[1], arguments.slice_from(2)),
 					None => log!("Could not find any cheats named {}\n", cheat_name) // cheat not found
 				}
 			},

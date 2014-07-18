@@ -100,7 +100,6 @@ impl Triggerbot {
 
 		if ( trace.ent.is_not_null() )
 		{
-			let entidx = unsafe { trace.ent.to_option().unwrap().get_index() };	
 			//log!("Hit entity {} at hitgroup {}\n", entidx, unsafe { sdk::trace_t_gethitgroup(&trace)});
 			if (trace.hitgroup ==  1) && 
 					unsafe {

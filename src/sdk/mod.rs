@@ -1,3 +1,5 @@
+#![allow(non_camel_case_types)]
+#![allow(dead_code)]
 pub use libc::c_char;
 use libc;
 use core;
@@ -39,7 +41,7 @@ pub struct trace_t {
 	fractionleftsurface: libc::c_float,
 	surface: csurface_t,
 	pub hitgroup: libc::c_int,
-	physicsbone: libc::c_short,
+	pub physicsbone: libc::c_short,
 	pub ent: *mut C_BaseEntity,
 	hitbox: libc::c_int
 }

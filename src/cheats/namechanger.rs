@@ -38,7 +38,7 @@ impl Cheat for NameChanger {
 			if local_baseentity.is_not_null() {
 				unsafe { ::core::mem::transmute(local_baseentity) }
 			} else {
-				log!("IClientEntity of local player (id: {}) not found!\n", localplayer_entidx); unsafe { libc::exit(1) }; 
+				quit!("IClientEntity of local player (id: {}) not found!\n", localplayer_entidx); 
 			}
 		};
 		
@@ -52,12 +52,12 @@ impl Cheat for NameChanger {
 			let mut buf = [0u8, ..300];
 			let len = unsafe { ptrs.ivengineclient.to_option().unwrap() }.get_player_name(unsafe {&*ptr}, buf.as_mut_slice());
 			if len == 0 { return; }
+			
+			// Copy a zero-width space onto the end of the name.
 			for (dst, src) in (buf.as_mut_slice().mut_slice_from(len as uint).mut_iter()).zip(b"\xe2\x80\x8b".iter()) {
 				*dst = *src;
 			}
 			
-			let str_name = ::core::str::from_utf8(buf.as_slice());
-			//log!("player named {}\n", str_name);
 			if unsafe { *((*ptr).ptr_offset::<u32>(0x00AC)) == *(me.ptr_offset::<u32>(0x00AC)) } {
 				// teammates
 				if unsafe { (*ptr).get_index() != me.get_index() && (*ptr).get_index() != self.last_victim } {
