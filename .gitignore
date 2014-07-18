@@ -49,3 +49,4 @@ libc.lib
 wrapper.lib
 target/rainstorm.lib
 target/rainstorm.lib
+target/rainstorm.lib

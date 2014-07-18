@@ -12,7 +12,7 @@ impl Cheat for Speedhack {
 	fn get_name<'a>(&'a self) -> &'a str {
 		"Speedhack"
 	}
-	fn process_usercmd(&mut self, ptrs: &GamePointers, cmd: &mut sdk::CUserCmd) {
+	fn process_usercmd(&mut self, _ptrs: &GamePointers, cmd: &mut sdk::CUserCmd) {
 		if !self.enabled {
 			return;
 		}

@@ -2,7 +2,6 @@ use core::prelude::*;
 use Cheat;
 use sdk;
 use libc;
-use CheatManager;
 use GamePointers;
 use rand::Rng;
 use core::raw::Repr;

@@ -94,12 +94,11 @@ impl Triggerbot {
 		let ray = sdk::Ray_t::new(&eyes, &direction);
 
 		ienginetrace.trace_ray(&ray, 0x46004001, None, &mut trace);
-		if ( trace.base.allsolid ) {
+		if trace.base.allsolid  {
 			return false;
 		}
 
-		if ( trace.ent.is_not_null() )
-		{
+		if  trace.ent.is_not_null() {
 			//log!("Hit entity {} at hitgroup {}\n", entidx, unsafe { sdk::trace_t_gethitgroup(&trace)});
 			if (trace.hitgroup ==  1) && 
 					unsafe {

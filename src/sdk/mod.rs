@@ -234,7 +234,7 @@ extern "C" {
 	pub fn getptr_ibaseclientdll() -> * mut IBaseClientDLL; // MAYBE NULL
 	pub fn getptr_icvar(app_sys_factory: * mut AppSysFactory) -> * mut ICvar;
 	
-	pub fn trace_t_gethitgroup(trace: *const trace_t) -> int;
+	pub fn trace_t_gethitgroup(trace: *const trace_t) -> libc::c_int;
 	fn c_baseentity_getorigin(ent: *const C_BaseEntity) -> Vector;
 	fn c_baseentity_getindex(ent: *const C_BaseEntity) -> libc::c_int;
 	

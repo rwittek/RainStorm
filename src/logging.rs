@@ -50,7 +50,7 @@ impl core::fmt::FormatWriter for Logger {
 
 pub unsafe fn set_fd(fd: libc::c_int) -> core::result::Result<(), ()> {
 	match LOGGER {
-		Some(logger) => Err(()), // already exists!
+		Some(_logger) => Err(()), // already exists!
 		None => {
 			LOGGER = Some(Logger::new(fd));
 			Ok(())
@@ -60,7 +60,7 @@ pub unsafe fn set_fd(fd: libc::c_int) -> core::result::Result<(), ()> {
 
 pub fn log_fmt(args: &core::fmt::Arguments) -> core::fmt::Result {
 	unsafe { match LOGGER {
-		Some(mut logger) => {logger.write_fmt(args); Ok(())},
+		Some(mut logger) => {logger.write_fmt(args)},
 		None => Err(core::fmt::WriteError)
 	}}
 }
