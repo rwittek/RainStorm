@@ -13,19 +13,41 @@ impl Cheat for Speedhack {
 		"Speedhack"
 	}
 	fn process_usercmd(&mut self, _ptrs: &GamePointers, cmd: &mut sdk::CUserCmd) {
+		use sdk::{IN_ATTACK, IN_FORWARD, IN_BACK, IN_MOVELEFT, IN_MOVERIGHT};
+		
 		if !self.enabled {
 			return;
 		}
 		
-		// FIXME: hook input, see which way we want to go
-		// atm, we can't move backwards which is annoying,
-		// and moving sideways gets regular speed
-		if (cmd.buttons & (1 << 0)) == 0 && (cmd.forwardmove > 0.1f32 || cmd.forwardmove < -0.001f32) {
-			// speedhack time
-			cmd.forwardmove = -999f32; // the server will cap this at our actual max. movement speed
+		if (cmd.buttons & IN_ATTACK) == 0 {
+			use core::f32::consts::PI;
+			use core::intrinsics::{cosf32, sinf32, fabsf32};
+			// maybe we can go fast! yay!
+			
+			// in RADIANS
+			let (mut forward, mut side) = (0f32, 0f32);
+			let mut can_move = false; // true if at least one movement key held down
+			
+			
+			if (cmd.buttons & IN_FORWARD != 0) { forward = 1.0; can_move = true; }
+			if (cmd.buttons & IN_BACK != 0) { forward = -1.0; can_move = true; }
+			if (cmd.buttons & IN_MOVELEFT != 0) { side = 1.0; can_move = true; }
+			if (cmd.buttons & IN_MOVERIGHT != 0) { side = -1.0; can_move = true; }
+			
+			// remember high-school trig?
+			let rotang = unsafe { ::cmath::atan2f(side, forward) };
+			
+			//rotang = rotang % (PI * 2.0f32);
+			
+			if !can_move {
+				return;
+			}
+			
+
+			cmd.forwardmove = -999f32;
 			
 			cmd.viewangles.pitch = 89f32;
-			cmd.viewangles.yaw = (cmd.viewangles.yaw + 180f32) % 360f32; // flip us around
+			cmd.viewangles.yaw = (cmd.viewangles.yaw + 180f32 + (180f32 * rotang / PI)) % 360f32; // flip us around
 			cmd.viewangles.roll= 90f32; // apparently not capped, ggnore
 		}
 	}

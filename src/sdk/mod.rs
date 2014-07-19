@@ -25,6 +25,30 @@ pub enum IHandleEntity {}
 pub enum IClientEntityList {}
 pub enum IEngineTrace {}
 
+pub static IN_ATTACK: libc::c_int = (1 << 0);
+pub static IN_JUMP: libc::c_int = (1 << 1);
+pub static IN_DUCK: libc::c_int = (1 << 2);
+pub static IN_FORWARD: libc::c_int = (1 << 3);
+pub static IN_BACK: libc::c_int = (1 << 4);
+pub static IN_USE: libc::c_int = (1 << 5);
+pub static IN_CANCEL: libc::c_int = (1 << 6);
+pub static IN_LEFT: libc::c_int = (1 << 7);
+pub static IN_RIGHT: libc::c_int = (1 << 8);
+pub static IN_MOVELEFT: libc::c_int = (1 << 9);
+pub static IN_MOVERIGHT: libc::c_int = (1 << 10);
+pub static IN_ATTACK2: libc::c_int = (1 << 11);
+pub static IN_RUN: libc::c_int = (1 << 12);
+pub static IN_RELOAD: libc::c_int = (1 << 13);
+pub static IN_ALT1: libc::c_int = (1 << 14);
+pub static IN_ALT2: libc::c_int = (1 << 15);
+pub static IN_SCORE: libc::c_int = (1 << 16); // Used by client.dll for when scoreboard is held down
+pub static IN_SPEED: libc::c_int = (1 << 17); // Player is holding the speed key
+pub static IN_WALK: libc::c_int = (1 << 18); // Player holding walk key
+pub static IN_ZOOM: libc::c_int = (1 << 19); // Zoom key for HUD zoom
+pub static IN_WEAPON1: libc::c_int = (1 << 20);// weapon defines these bits
+pub static IN_WEAPON2: libc::c_int = (1 << 21);// weapon defines these bits
+pub static IN_BULLRUSH: libc::c_int = (1 << 22);
+
 pub struct CBaseTrace {
 	startpos: Vector,
 	endpos: Vector,
