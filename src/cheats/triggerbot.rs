@@ -1,5 +1,4 @@
 use Cheat;
-use CheatManager;
 use GamePointers;
 use sdk;
 use libc;

@@ -170,7 +170,7 @@ impl IClientEntityList {
 impl IEngineTrace {
 	pub fn trace_ray(&self, ray: &Ray_t, mask: u32, filter: Option<&mut IEngineTrace>, trace: &mut trace_t) {
 		let filter_ptr = match filter {
-			Some(ptr) => ptr,
+			Some(ptr) => ptr as *mut IEngineTrace,
 			None => core::ptr::mut_null()
 		};
 		unsafe { ienginetrace_traceray(self, ray, mask, filter_ptr, trace) };

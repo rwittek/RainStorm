@@ -35,7 +35,7 @@ impl Cheat for NameChanger {
 			let localplayer_entidx = ptrs.ivengineclient.to_option().unwrap().get_local_player();
 			let local_baseentity = ptrs.icliententitylist.to_option().unwrap().get_client_entity(localplayer_entidx);
 			if local_baseentity.is_not_null() {
-				unsafe { ::core::mem::transmute(local_baseentity) }
+				::core::mem::transmute(local_baseentity)
 			} else {
 				quit!("IClientEntity of local player (id: {}) not found!\n", localplayer_entidx); 
 			}

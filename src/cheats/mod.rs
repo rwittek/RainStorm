@@ -1,7 +1,6 @@
 use sdk;
 use alloc::owned::Box;
 use collections::Vec;
-use core::iter::Iterator;
 use core::prelude::*;
 use alloc;
 use core;
@@ -11,6 +10,7 @@ pub mod triggerbot;
 pub mod speedhack;
 pub mod cvarunlocker;
 pub mod namechanger;
+
 pub static mut CHEAT_MANAGER: *mut CheatManager = 0 as *mut CheatManager;
 
 pub fn cheatmgr_setup() {
