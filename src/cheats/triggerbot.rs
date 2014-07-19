@@ -93,6 +93,7 @@ impl Triggerbot {
 		let ray = sdk::Ray_t::new(&eyes, &direction);
 
 		ienginetrace.trace_ray(&ray, 0x46004001, None, &mut trace);
+		
 		if trace.base.allsolid  {
 			return false;
 		}

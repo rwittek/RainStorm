@@ -168,7 +168,7 @@ impl IClientEntityList {
 	}
 }
 impl IEngineTrace {
-	pub fn trace_ray(&self, ray: &Ray_t, mask: u32, filter: Option<*mut IEngineTrace>, trace: &mut trace_t) {
+	pub fn trace_ray(&self, ray: &Ray_t, mask: u32, filter: Option<&mut IEngineTrace>, trace: &mut trace_t) {
 		let filter_ptr = match filter {
 			Some(ptr) => ptr,
 			None => core::ptr::mut_null()

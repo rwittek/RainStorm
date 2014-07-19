@@ -675,3 +675,38 @@ extern "C" size_t ivengineclient_getplayername(IVEngineClient *eng, C_BaseEntity
 extern "C" void ienginetrace_traceray(IEngineTrace *enginetrace, const Ray_t &ray, unsigned int fMask, ITraceFilter *pTraceFilter, trace_t *pTrace ) {
 	enginetrace->TraceRay(ray, fMask, pTraceFilter, pTrace);
 }
+class TriggerbotTraceFilter : public ITraceFilter
+{
+	extern "C" bool (*predicate)(IHandleEntity *ent);
+    virtual bool ShouldHitEntity( IHandleEntity *pEntity, int contentsMask );
+    virtual TraceType_t  GetTraceType() const;
+};
+bool TriggerbotTraceFilter::ShouldHitEntity( IHandleEntity* pHandle, int contentsMask )
+{
+    CBaseEntity* pEnt = static_cast<CBaseEntity*>( pHandle );
+
+    // Huge Credits: Casual_Hacker, I had copied all the code he provided.
+    ClientClass* pEntCC = pEnt->GetClientClass();
+    const char* ccName = pEntCC->GetName();
+	fprintf(logfile, "%s\n", ccName);
+	if (strcmp(ccName, "CTFPlayer") == 0) {
+		hit_player = true;
+		return true;
+	}
+    if ( strcmp(ccName, "CFuncRespawnRoomVisualizer") || strcmp(ccName, "CTFMedigunShield") ||
+        strcmp(ccName,"CFuncAreaPortalWindow"))
+    {
+        return false;
+    }
+
+    if ( pEnt == dynamic_cast<C_BaseEntity*>(getptr_icliententitylist()->GetClientEntity(rainstorm_getivengineclient()->GetLocalPlayer( ) )) )
+    {
+        return false;
+    }
+
+    return true;
+}
+TraceType_t TriggerbotTraceFilter::GetTraceType() const
+{
+    return TRACE_EVERYTHING;
+}

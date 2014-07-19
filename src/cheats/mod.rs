@@ -11,7 +11,6 @@ pub mod triggerbot;
 pub mod speedhack;
 pub mod cvarunlocker;
 pub mod namechanger;
-
 pub static mut CHEAT_MANAGER: *mut CheatManager = 0 as *mut CheatManager;
 
 pub fn cheatmgr_setup() {
@@ -58,7 +57,6 @@ impl CheatManager {
 		let cvarunlocker: Box<cvarunlocker::CvarUnlocker> = box Cheat::new();
 		let speedhack: Box<speedhack::Speedhack> = box Cheat::new();
 		let namechanger: Box<namechanger::NameChanger> = box Cheat::new();
-		
 		let mut mgr = CheatManager { 
 			cheats: Vec::new(),
 			
