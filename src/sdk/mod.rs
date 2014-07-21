@@ -21,9 +21,11 @@ pub enum PhysicsFactory {}
 pub enum Globals {}
 pub enum CInput {}
 pub enum C_BaseEntity {}
+pub enum C_BaseAnimating {}
 pub enum IHandleEntity {}
 pub enum IClientEntityList {}
 pub enum IEngineTrace {}
+pub enum IVModelInfo {}
 
 pub static IN_ATTACK: libc::c_int = (1 << 0);
 pub static IN_JUMP: libc::c_int = (1 << 1);
@@ -87,6 +89,7 @@ pub struct cplane_t {
 	signbits: u8,
 	pad: [u8, ..2]
 }
+#[deriving(Show)]
 pub struct Vector {
 	pub x: libc::c_float,
 	pub y: libc::c_float,
@@ -136,11 +139,33 @@ impl C_BaseEntity {
 	pub fn get_origin(&self) -> Vector {
 		unsafe { c_baseentity_getorigin(self) }
 	}
+	pub fn worldspacecenter(&self) -> Vector {
+		unsafe { c_baseentity_worldspacecenter(self) }
+	}
 	pub fn get_index(&self) -> libc::c_int {
 		unsafe { c_baseentity_getindex(self) }
 	}
-	pub unsafe fn ptr_offset<DataType>(&mut self, offset: uint) -> *mut DataType {
+	pub fn get_life_state(&self) -> i8 {
+		unsafe { *(self.ptr_offset::<i8>(0x00A1)) }
+	}
+	pub fn get_team(&self) -> u32 {
+		unsafe {*(self.ptr_offset(0x00AC))}
+	}
+	pub fn get_class(&self) -> u32 {
+		unsafe {*(self.ptr_offset(0x1524))}
+	}
+	pub fn get_classname<'a>(&'a self) -> &'a str {
+		unsafe {
+			let cstr_classname = c_baseentity_getclassname(self);
+			// TODO: null check?
+			core::str::raw::c_str_to_static_slice(cstr_classname)
+		}
+	}
+	pub unsafe fn mut_ptr_offset<DataType>(&mut self, offset: uint) -> *mut DataType {
 		(((self as *mut C_BaseEntity as uint) + offset) as *mut DataType)
+	}
+	pub unsafe fn ptr_offset<DataType>(&self, offset: uint) -> *const DataType {
+		(((self as *const C_BaseEntity as uint) + offset) as *const DataType)
 	}
 }
 		
@@ -156,10 +181,18 @@ impl Vector {
 	pub fn scale(&self, factor: f32) -> Vector {
 		Vector {x: self.x * factor, y: self.y * factor, z: self.z * factor}
 	}
+	pub fn length(&self) -> f32 {
+		unsafe { vector_length(self) }
+	}
 }
 impl core::ops::Add<Vector, Vector> for Vector {
 	fn add(&self, rhs: &Vector) -> Vector {
 		Vector {x: self.x + rhs.x, y: self.y + rhs.y, z: self.z + rhs.z}
+	}
+}
+impl core::ops::Sub<Vector, Vector> for Vector {
+	fn sub(&self, rhs: &Vector) -> Vector {
+		Vector {x: self.x - rhs.x, y: self.y - rhs.y, z: self.z - rhs.z}
 	}
 }
 impl IVEngineClient {
@@ -260,8 +293,13 @@ extern "C" {
 	
 	pub fn trace_t_gethitgroup(trace: *const trace_t) -> libc::c_int;
 	fn c_baseentity_getorigin(ent: *const C_BaseEntity) -> Vector;
+	fn c_baseentity_worldspacecenter(ent: *const C_BaseEntity) -> Vector;
 	fn c_baseentity_getindex(ent: *const C_BaseEntity) -> libc::c_int;
+	fn c_baseentity_getclassname(ent: *const C_BaseEntity) -> *const libc::c_char;
 	
+	pub fn getptr_ivmodelinfo() -> *mut IVModelInfo;
+	
+	pub fn c_baseanimating_gethitboxposition(ent: &C_BaseAnimating, modelinfo: *mut IVModelInfo, hitbox: libc::c_int, org: &mut Vector, angles: &QAngle);
 	pub fn getptr_cinput(client: *mut IBaseClientDLL) -> *mut CInput;
 	fn icvar_findvar(icvar: * const ICvar, name: * const char) -> * mut ConVar; // MAYBE NULL;
 	pub fn convar_setvalue_raw_int(cvar: * mut ConVar, value: libc::c_int);
@@ -270,7 +308,8 @@ extern "C" {
 	pub fn convar_changeandfreeze(cvar: * mut ConVar, newval: CString);
 	
 	pub fn angle_vectors(angle: &QAngle, vec1: *mut Vector, vec2: *mut Vector, vec3: *mut Vector);
-	
+	pub fn vector_angles(vector: &Vector, angles: &mut QAngle);
+	pub fn vector_length(vector: &Vector) -> libc::c_float;
 	pub fn ray_t_init(ray: &mut Ray_t, start: &Vector, end: &Vector);
 	
 	pub fn create_tracefilter_from_predicate(predicate: extern "C" fn(ent: *const IHandleEntity, contentsmask: i32) -> bool) -> PredicateTraceFilter;

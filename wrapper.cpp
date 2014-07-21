@@ -585,6 +585,12 @@ extern "C" IEngineTrace * getptr_ienginetrace() {
 	CreateInterfaceFn EngineFactory = ( CreateInterfaceFn ) GetProcAddress( hmEngine, "CreateInterface" );
 	return ( IEngineTrace* ) EngineFactory( INTERFACEVERSION_ENGINETRACE_CLIENT, NULL );
 }
+extern "C" IVModelInfo * getptr_ivmodelinfo() {
+	HMODULE hmEngine = GetModuleHandleSafe( "engine.dll" );
+	CreateInterfaceFn EngineFactory = ( CreateInterfaceFn ) GetProcAddress( hmEngine, "CreateInterface" );
+	return ( IVModelInfo * ) EngineFactory( VMODELINFO_CLIENT_INTERFACE_VERSION, NULL );
+}
+
 
 extern "C" void * getptr_icvar(CreateInterfaceFn unused) {
 	ICvar *ptr = (ICvar *)AppSysFactory( CVAR_INTERFACE_VERSION, NULL );
@@ -650,6 +656,12 @@ extern "C" ClientClass *ibaseclientdll_getallclasses(IBaseClientDLL *client) {
 extern "C" void angle_vectors(QAngle &angle, Vector *vec1, Vector *vec2, Vector *vec3) {
 	AngleVectors(angle, vec1, vec2, vec3);
 }
+extern "C" void vector_angles(Vector *vec, QAngle *angles) {
+	VectorAngles(*vec, *angles);
+}
+extern "C" float vector_length(Vector *vec) {
+	return vec->Length();
+}
 extern "C" void ray_t_init(Ray_t &ray, Vector &start, Vector &end) {
 	ray.Init(start, end);
 }
@@ -660,8 +672,55 @@ extern "C" IClientEntity *icliententitylist_getcliententity(IClientEntityList *c
 extern "C" Vector c_baseentity_getorigin(C_BaseEntity *ent) {
 	return ent->GetAbsOrigin();
 }
+extern "C" Vector c_baseentity_worldspacecenter(C_BaseEntity *ent) {
+	return ent->WorldSpaceCenter();
+}
+extern "C" bool c_baseentity_isalive(C_BaseEntity *ent) {
+	return ent->IsAlive();
+}
 extern "C" int c_baseentity_getindex(C_BaseEntity *ent) {
 	return ent->index;
+}
+void get_bone_position(C_BaseAnimating *ent, IVModelInfo *modelinfo, int iBone, Vector &origin, QAngle &angles )
+{
+	studiohdr_t *pStudioHdr = modelinfo->GetStudiomodel( ent->GetModel( ) );
+
+	if (!pStudioHdr)
+		return;
+
+	if (iBone < 0 || iBone >= pStudioHdr->numbones)
+		return;
+
+	matrix3x4_t bonetoworld[128];
+
+	if( !ent->SetupBones( bonetoworld, MAXSTUDIOBONES, BONE_USED_BY_HITBOX, 0) )
+        return;
+
+	float x = bonetoworld[iBone][0][3];
+	float y = bonetoworld[iBone][1][3];
+	float z = bonetoworld[iBone][2][3];
+
+	origin = Vector(x, y, z);
+}
+void get_hitbox_position(C_BaseAnimating *ent, IVModelInfo *modelinfo, int hitboxIndex, Vector &origin, QAngle &angles )
+{
+	int bone = -1;
+	studiohdr_t *pStudioHdr = modelinfo->GetStudiomodel(ent->GetModel());
+	if ( pStudioHdr )
+	{
+		mstudiohitboxset_t *set =pStudioHdr->pHitboxSet( ent->m_nHitboxSet );
+		if ( set && hitboxIndex < set->numhitboxes )
+		{
+			bone = set->pHitbox( hitboxIndex )->bone;
+		}
+	}
+	if (bone == -1) return;
+	
+	get_bone_position(ent, modelinfo, bone, origin, angles);
+}
+
+extern "C" void c_baseanimating_gethitboxposition(C_BaseAnimating *ent, IVModelInfo *modelinfo, int iBone, Vector &origin, QAngle &angles ) {
+	get_hitbox_position(ent, modelinfo, iBone, origin, angles);
 }
 extern "C" size_t ivengineclient_getplayername(IVEngineClient *eng, C_BaseEntity *ent, char *buf, size_t bufsize) {
 	player_info_t info;
@@ -688,4 +747,9 @@ bool TriggerbotTraceFilter::ShouldHitEntity( IHandleEntity* pHandle, int content
 TraceType_t TriggerbotTraceFilter::GetTraceType() const
 {
     return TRACE_EVERYTHING;
+}
+extern "C" const char *c_baseentity_getclassname(C_BaseEntity *ent) {
+	ClientClass* pEntCC = ent->GetClientClass();
+	const char* ccName = pEntCC->GetName();
+	return ccName;
 }
