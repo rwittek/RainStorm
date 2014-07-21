@@ -10,7 +10,8 @@ pub mod triggerbot;
 pub mod speedhack;
 pub mod cvarunlocker;
 pub mod namechanger;
-
+pub mod airstuck;
+ 
 pub static mut CHEAT_MANAGER: *mut CheatManager = 0 as *mut CheatManager;
 
 pub fn cheatmgr_setup() {
@@ -57,6 +58,8 @@ impl CheatManager {
 		let cvarunlocker: Box<cvarunlocker::CvarUnlocker> = box Cheat::new();
 		let speedhack: Box<speedhack::Speedhack> = box Cheat::new();
 		let namechanger: Box<namechanger::NameChanger> = box Cheat::new();
+		let airstuck: Box<airstuck::Airstuck> = box Cheat::new();
+		
 		let mut mgr = CheatManager { 
 			cheats: Vec::new(),
 			
@@ -67,6 +70,7 @@ impl CheatManager {
 		mgr.cheats.push(triggerbot);
 		mgr.cheats.push(speedhack);
 		mgr.cheats.push(namechanger);
+		mgr.cheats.push(airstuck);
 		mgr
 	}
 	pub fn handle_command(&mut self, command: &str, arguments: &[&str]) {
