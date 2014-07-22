@@ -32,6 +32,12 @@ impl Aimbot {
 		let mut maxdist = 100000.0;
 		let mut best_targ: Option<sdk::Vector> = None;
 		
+		let mut ivengineclient = unsafe { ptrs.ivengineclient.to_option().unwrap() };
+		let mut icliententitylist = unsafe { ptrs.icliententitylist.to_option().unwrap() };
+		let mut ienginetrace = unsafe { ptrs.ienginetrace.to_option().unwrap() };
+		
+		let mut tempangles = sdk::QAngle { pitch: 0.0, yaw: 0.0, roll: 0.0 };
+		
 		::utils::map_all_players(ptrs.icliententitylist, |ptr| {
 			if unsafe { (*ptr).get_team() == me.get_team() } {
 				// teammates
@@ -54,9 +60,15 @@ impl Aimbot {
 						(*ptr).worldspacecenter()
 				} }
 			};
-				
+			let aimvec = pos - eyes;
+			unsafe { sdk::vector_angles(&aimvec, &mut tempangles) };
+			// can we actually see this?
+			if !::utils::should_shoot(ivengineclient, icliententitylist, ienginetrace, &tempangles, None) {
+				// can't see it
+				return;
+			}
 			// TODO: priority
-			let dist = (pos - eyes).length();
+			let dist = (aimvec).length();
 			if dist < maxdist {
 				//log!("target: {}, {}, {}", unsafe {(*ptr).get_index()}, pos, dist);
 				maxdist = dist;
@@ -68,7 +80,7 @@ impl Aimbot {
 	}		
 			
 			
-	fn aim_at_target(&self, ptrs: &GamePointers, cmd: &mut sdk::CUserCmd, target: sdk::Vector) {
+	fn aim_at_target(&self, ptrs: &GamePointers, viewangles: &mut sdk::QAngle, target: sdk::Vector) {
 		let localplayer_entidx = unsafe {ptrs.ivengineclient.to_option().unwrap().get_local_player()};
 		let local_baseentity = unsafe {ptrs.icliententitylist.to_option().unwrap().get_client_entity(localplayer_entidx)};
 		
@@ -89,7 +101,7 @@ impl Aimbot {
 		
 		let aimvec = target - eyes;
 		unsafe {
-			sdk::vector_angles(&aimvec, &mut cmd.viewangles);
+			sdk::vector_angles(&aimvec, viewangles);
 		}
 	}
 }
@@ -111,8 +123,8 @@ impl Cheat for Aimbot {
 		
 		let maybe_targspot = self.find_target_spot(ptrs, &cmd.viewangles);
 		match maybe_targspot {
-			Some(targspot) => { self.aim_at_target(ptrs, cmd, targspot) },
-			None => {return} // nothing to aim at
+			Some(targspot) => { self.aim_at_target(ptrs, &mut cmd.viewangles, targspot) },
+			None => {cmd.buttons = cmd.buttons & (!sdk::IN_ATTACK); return} // nothing to aim at
 		}
 	}
 

@@ -99,6 +99,7 @@ pub struct GamePointers {
 	ibaseclientdll: *mut sdk::IBaseClientDLL,
 	ienginetrace: *mut sdk::IEngineTrace,
 	appsysfactory: *mut sdk::AppSysFactory,
+	ivmodelinfo: *mut sdk::IVModelInfo,
 	icvar: *mut sdk::ICvar
 }
 
@@ -131,6 +132,13 @@ impl GamePointers {
 				match ienginetrace_ptr.is_not_null() {
 					true => { log!("IEngineTrace found at {}\n", ienginetrace_ptr); ienginetrace_ptr },
 					false => { quit!("IEngineTrace not found, dying\n") }
+				}
+			},
+			ivmodelinfo: unsafe {
+				let ivmodelinfo_ptr = sdk::getptr_ivmodelinfo();
+				match ivmodelinfo_ptr.is_not_null() {
+					true => { log!("IVModelInfo found at {}\n", ivmodelinfo_ptr); ivmodelinfo_ptr },
+					false => { quit!("IVModelInfo not found, dying\n") }
 				}
 			},
 			appsysfactory: core::ptr::mut_null(),

@@ -34,7 +34,7 @@ impl Cheat for Triggerbot {
 		if cmd.buttons & 1 == 1 {
 			cmd.buttons = !((!cmd.buttons) | 1); // zero the IN_ATTACK bit
 			
-			if self.should_shoot(ivengineclient, icliententitylist, ienginetrace, &cmd.viewangles) {
+			if ::utils::should_shoot(ivengineclient, icliententitylist, ienginetrace, &cmd.viewangles, None) {
 				self.smoothing_state = self.smoothing_state + 1;
 				if self.smoothing_state > self.smoothing {
 					cmd.buttons = cmd.buttons | 1; // set IN_ATTACK
@@ -60,55 +60,4 @@ impl Cheat for Triggerbot {
 }
 
 impl Triggerbot {
-	fn should_shoot(&self, ivengineclient: &sdk::IVEngineClient, icliententitylist: &sdk::IClientEntityList,
-			ienginetrace: &sdk::IEngineTrace, viewangles: &sdk::QAngle) -> bool {
-		let mut trace = unsafe { sdk::trace_t::new() };
-		//let filter = sdk::create_tracefilter_from_predicate(should_hit_entity);
-
-		let localplayer_entidx = ivengineclient.get_local_player();
-		let local_baseentity = icliententitylist.get_client_entity(localplayer_entidx);
-		
-		let me: &mut sdk::C_BaseEntity = if local_baseentity.is_not_null() {
-			unsafe { core::mem::transmute(local_baseentity) }
-		} else {
-			log!("IClientEntity of local player (id: {}) not found!\n", localplayer_entidx); unsafe { libc::exit(1) }; 
-		};
-
-		let mut direction = sdk::Vector::new();
-
-		unsafe {
-			sdk::angle_vectors(viewangles, &mut direction, core::ptr::mut_null(), core::ptr::mut_null());
-		}
-		let mut eyes = me.get_origin();
-		
-		unsafe {
-			let eye_offsets: [f32, ..3] = *(me.ptr_offset(0xF8));
-			eyes.x += (eye_offsets)[0];
-			eyes.y += (eye_offsets)[1];
-			eyes.z += (eye_offsets)[2];
-		}
-		direction = direction.scale( 8192.0f32 ) + eyes;
-		
-		let ray = sdk::Ray_t::new(&eyes, &direction);
-
-		ienginetrace.trace_ray(&ray, 0x46004001, None, &mut trace);
-		
-		if trace.base.allsolid  {
-			return false;
-		}
-
-		if  trace.ent.is_not_null() {
-			//log!("Hit entity {} at hitgroup {}\n", entidx, unsafe { sdk::trace_t_gethitgroup(&trace)});
-			if (trace.hitgroup ==  1) && 
-					unsafe {
-						*((*trace.ent).ptr_offset::<u32>(0x00AC)) != *(me.ptr_offset(0x00AC))
-					}
-			{
-				return true;
-			}
-			return false; //pTrace.m_pEnt->m_iTeamNum != pBaseEntity->m_iTeamNum; // Avoid teammates.
-		}
-
-		false
-	}
 }

@@ -69,7 +69,7 @@ pub struct trace_t {
 	pub hitgroup: libc::c_int,
 	pub physicsbone: libc::c_short,
 	pub ent: *mut C_BaseEntity,
-	hitbox: libc::c_int
+	pub hitbox: libc::c_int
 }
 
 pub struct QAngle {
