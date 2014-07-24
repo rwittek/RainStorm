@@ -5,7 +5,11 @@ use core::prelude::*;
 
 pub struct Aimbot {
 	enabled: bool,
-	hitbox: Option<i32>
+	hitbox: Option<i32>,
+	stop_firing: u8,
+	
+	last_interpdata: Option<(f32, sdk::Vector)>,
+	last_last_interpdata: Option<(f32, sdk::Vector)>
 }
 
 impl Aimbot {
@@ -75,12 +79,46 @@ impl Aimbot {
 				best_targ = Some(pos);
 			}
 		});
-		//log!("best target: {}\n", best_targ);
+		
 		best_targ
+		/*match best_targ {
+			Some(best_targ) => {
+				//log!("best target: {}\n", best_targ);
+				let interped_target = match self.last_interpdata {
+					Some((last_time, last_targ)) => { match self.last_last_interpdata {
+						Some((last_last_time, last_last_targ)) => {
+							let delta_t = last_time - last_last_time;
+							let delta_p = last_targ - last_last_targ;
+							
+							let latency = unsafe { sdk::get_current_latency(ptrs.ivengineclient) };
+							log!("latency: {}\n", latency);
+							Some(best_targ - (delta_p.scale( latency / delta_t )))
+						}, 
+						None => {
+							log!("meow!\n");
+							self.last_last_interpdata = self.last_interpdata;
+							self.last_interpdata = Some(( unsafe {
+								(*ptrs.ivengineclient).time() }, best_targ));
+							
+							None
+						}
+					}},
+					None => {
+						log!("woof!\n");
+						self.last_interpdata = Some(( unsafe {(*ptrs.ivengineclient).time() }, best_targ));
+						None
+					}
+				};
+		
+				interped_target
+			},
+			None => None
+		}*/
+	
 	}		
 			
 			
-	fn aim_at_target(&self, ptrs: &GamePointers, viewangles: &mut sdk::QAngle, target: sdk::Vector) {
+	fn aim_at_target(&self, ptrs: &GamePointers, cmd: &mut sdk::CUserCmd, target: sdk::Vector) {
 		let localplayer_entidx = unsafe {ptrs.ivengineclient.to_option().unwrap().get_local_player()};
 		let local_baseentity = unsafe {ptrs.icliententitylist.to_option().unwrap().get_client_entity(localplayer_entidx)};
 		
@@ -98,17 +136,20 @@ impl Aimbot {
 			eyes.y += (eye_offsets)[1];
 			eyes.z += (eye_offsets)[2];
 		}
-		
 		let aimvec = target - eyes;
+		
+		// interpolate
+		
 		unsafe {
-			sdk::vector_angles(&aimvec, viewangles);
+			sdk::vector_angles(&aimvec, &mut cmd.viewangles);
 		}
+		
 	}
 }
 
 impl Cheat for Aimbot {
 	fn new() -> Aimbot {
-		Aimbot { enabled: false, hitbox: None }
+		Aimbot { enabled: false, hitbox: None, stop_firing: 0, last_interpdata: None, last_last_interpdata: None }
 	}
 	fn get_name<'a>(&'a self) -> &'a str {
 		"Aimbot"
@@ -123,8 +164,13 @@ impl Cheat for Aimbot {
 		
 		let maybe_targspot = self.find_target_spot(ptrs, &cmd.viewangles);
 		match maybe_targspot {
-			Some(targspot) => { self.aim_at_target(ptrs, &mut cmd.viewangles, targspot) },
-			None => {cmd.buttons = cmd.buttons & (!sdk::IN_ATTACK); return} // nothing to aim at
+			Some(targspot) => { self.aim_at_target(ptrs, cmd, targspot) },
+			None => {
+				if self.stop_firing != 0 {
+					cmd.buttons = cmd.buttons & (!sdk::IN_ATTACK)
+				};
+				return
+			} // nothing to aim at
 		}
 	}
 
@@ -139,6 +185,10 @@ impl Cheat for Aimbot {
 				self.hitbox = Some(::utils::str_to_integral(val[0]));
 				log!("Hitbox: {}\n", self.hitbox);
 			},
+			"stop_firing" => {
+				self.stop_firing = ::utils::str_to_integral(val[0]);
+				log!("Stop firing: {}\n", self.stop_firing);
+			}
 			_ => {}
 		}
 	}

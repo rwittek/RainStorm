@@ -91,6 +91,7 @@
 #include "public\steam\steam_api.h"
 #include "public\IGameUIFuncs.h"
 #include "public\toolframework\IEngineTool.h"
+#include "public\inetchannel.h"
 //===================================================================================
 // IBaseClientDLL interface from SDK
 //===================================================================================
@@ -489,6 +490,7 @@ extern "C" CInput *CINPUT_PTR;
 IClientEntityList *ENTLISTPTR;
 extern "C" int ( __stdcall *REAL_INIT)( CreateInterfaceFn appSysFactory, CreateInterfaceFn physicsFactory, CGlobalVarsBase* pGlobals );
 extern "C" void (__stdcall *REAL_CREATEMOVE)( int sequence_number, float input_sample_frametime, bool active );
+extern "C" bool (__stdcall *REAL_NETCHANNEL_SENDNETMSG)(INetMessage *msg, bool bForceReliable, bool bVoice);
 extern "C" void rainstorm_preinithook( CreateInterfaceFn appSysFactory, CreateInterfaceFn physicsFactory, CGlobalVarsBase* pGlobals );
 extern "C" void rainstorm_postinithook();
 extern "C" void rainstorm_process_usercmd(CUserCmd *cmd);
@@ -512,17 +514,61 @@ void __stdcall hooked_createmove_trampoline( int sequence_number, float input_sa
 {
 	(*REAL_CREATEMOVE)( sequence_number, input_sample_frametime, active );
 	IVEngineClient *engine = rainstorm_getivengineclient();
+	
 	if( engine->IsLevelMainMenuBackground( ) || engine->IsDrawingLoadingImage( ) || engine->IsInGame( ) == false )
 		return;
-	CUserCmd* pCommand = CINPUT_PTR->GetUserCmd( sequence_number );
+		
+		
+	static CUserCmd* pCommands = *(CUserCmd**)((DWORD)CINPUT_PTR + 0xC4);  
+	CUserCmd* pCommand = &pCommands[ sequence_number % 90 ];
+	
+	
 	rainstorm_process_usercmd(pCommand);
 	CVerifiedUserCmd *pSafeCommand = *reinterpret_cast<CVerifiedUserCmd**>((size_t)CINPUT_PTR + 0xC8) + (sequence_number%90);
 	pSafeCommand->m_cmd = *pCommand;
 	pSafeCommand->m_crc = pSafeCommand->m_cmd.GetChecksum();
 }
 
+bool __stdcall hooked_netchannel_sendnetmsg_trampoline(INetMessage *msg, bool bForceReliable, bool bVoice) {
+	// INetChannel *thisptr, 
+	//rainstorm_sendnetmsg(msg, bForceReliable, bVoice);qboolean
+	__asm {
+		nop
+		nop
+		nop
+	}
+	(*REAL_NETCHANNEL_SENDNETMSG)(msg, bForceReliable, bVoice);
+	fprintf(logfile, "meow meow, %p\n", REAL_NETCHANNEL_SENDNETMSG);
+	return false;
+}
+
+CUserCmd* __stdcall Hooked_GetUserCmd( int sequence_number ) 
+{ 
+    static CUserCmd* pCommands = *(CUserCmd**)((DWORD)CINPUT_PTR + 0xC4); 
+    return &pCommands[ sequence_number % 90 ]; 
+}
+extern "C" void *get_hooked_getusercmd() {
+	return &Hooked_GetUserCmd;
+}
+
+extern "C" void *get_netchannel_sendnetmsg_trampoline() {
+	return &hooked_netchannel_sendnetmsg_trampoline;
+}
 
 
+extern "C" INetChannel *get_current_inetchannel(IVEngineClient *engine) {
+	return (INetChannel *) engine->GetNetChannelInfo();
+}
+extern "C" ICvar * getptr_icvar(CreateInterfaceFn unused) {
+	ICvar *ptr = (ICvar *)AppSysFactory( CVAR_INTERFACE_VERSION, NULL );
+	// ewwwww.
+	ptr->RegisterConCommand((ConCommandBase *)&rainstorm_command);
+	return ptr;
+}
+extern "C" float get_current_latency(IVEngineClient *engine) {
+	float netlag = get_current_inetchannel(engine)->GetLatency(0);
+	return netlag;
+}
 
 DWORD WINAPI startup_thread( LPVOID lpArguments ) {
 	logfile = fopen("rainstorm_debug.txt", "w");
@@ -592,12 +638,7 @@ extern "C" IVModelInfo * getptr_ivmodelinfo() {
 }
 
 
-extern "C" void * getptr_icvar(CreateInterfaceFn unused) {
-	ICvar *ptr = (ICvar *)AppSysFactory( CVAR_INTERFACE_VERSION, NULL );
-	// ewwwww.
-	ptr->RegisterConCommand((ConCommandBase *)&rainstorm_command);
-	return ptr;
-}
+
 extern "C" IEngineTool * getptr_ienginetool() {
 	return (IEngineTool *) AppSysFactory( VENGINETOOL_INTERFACE_VERSION, NULL );
 }
@@ -722,6 +763,9 @@ void get_hitbox_position(C_BaseAnimating *ent, IVModelInfo *modelinfo, int hitbo
 extern "C" void c_baseanimating_gethitboxposition(C_BaseAnimating *ent, IVModelInfo *modelinfo, int iBone, Vector &origin, QAngle &angles ) {
 	get_hitbox_position(ent, modelinfo, iBone, origin, angles);
 }
+extern "C" void ivengineclient_setviewangles(IVEngineClient *eng, QAngle &ang) {
+	eng->SetViewAngles(ang);
+}
 extern "C" size_t ivengineclient_getplayername(IVEngineClient *eng, C_BaseEntity *ent, char *buf, size_t bufsize) {
 	player_info_t info;
 	if (eng->GetPlayerInfo(ent->index, &info)) {
@@ -752,4 +796,11 @@ extern "C" const char *c_baseentity_getclassname(C_BaseEntity *ent) {
 	ClientClass* pEntCC = ent->GetClientClass();
 	const char* ccName = pEntCC->GetName();
 	return ccName;
+}
+extern "C" bool ismousedown() {
+	return GetAsyncKeyState(VK_LBUTTON) != 0;
+}
+
+extern "C" int calc_seed_from_command_number(int commandnum) {
+	return MD5_PseudoRandom( commandnum ) & 0x7fffffff;
 }

@@ -26,6 +26,8 @@ pub enum IHandleEntity {}
 pub enum IClientEntityList {}
 pub enum IEngineTrace {}
 pub enum IVModelInfo {}
+pub enum INetChannel {}
+pub enum INetMessage {}
 
 pub static IN_ATTACK: libc::c_int = (1 << 0);
 pub static IN_JUMP: libc::c_int = (1 << 1);
@@ -111,7 +113,7 @@ pub struct CUserCmd {
 	pub weaponselect: i32,	
 	pub weaponsubtype: i32,
 
-	random_seed: i32,
+	pub random_seed: i32,
 
 	pub mousedx: u16,
 	pub mousedy: u16,
@@ -218,6 +220,11 @@ impl IVEngineClient {
 			ivengineclient_getplayername(self, ent, buf.repr().data as *mut u8, buf.repr().len as u32)
 		}
 	}
+	pub fn set_viewangles(&mut self, angles: &QAngle) {
+		unsafe {
+			ivengineclient_setviewangles(self, angles)
+		}
+	}
 }
 impl IClientEntityList {
 	pub fn get_client_entity(&self, entidx: libc::c_int) -> *mut C_BaseEntity {
@@ -275,13 +282,15 @@ impl ICvar {
 		}
 	}
 }
-	
+
 extern "C" {
 	pub fn getptr_ivengineclient() -> * mut IVEngineClient; // MAYBE NULL
 	fn ivengineclient_clientcmd(engine: & mut IVEngineClient, cmd_string: * const c_char);
 	fn ivengineclient_time(engine: &mut IVEngineClient) -> libc::c_float;
 	fn ivengineclient_getlocalplayer(engine: &IVEngineClient) -> libc::c_int;
 	fn ivengineclient_getplayername(eng: *const IVEngineClient, ent: *const C_BaseEntity, buf: *mut u8, bufsize: libc::size_t) -> libc::size_t;
+	fn ivengineclient_setviewangles(engine: &mut IVEngineClient, angles: &QAngle);
+
 	pub fn getptr_ienginetrace() -> * mut IEngineTrace; // MAYBE NULL
 	fn ienginetrace_traceray(enginetrace: &IEngineTrace, ray: &Ray_t, mask: u32, filter: *mut IEngineTrace, trace: &mut trace_t);
 	
@@ -313,4 +322,12 @@ extern "C" {
 	pub fn ray_t_init(ray: &mut Ray_t, start: &Vector, end: &Vector);
 	
 	pub fn create_tracefilter_from_predicate(predicate: extern "C" fn(ent: *const IHandleEntity, contentsmask: i32) -> bool) -> PredicateTraceFilter;
+	
+	pub fn get_current_inetchannel(engine: *mut IVEngineClient) -> *mut INetChannel;
+	pub fn get_current_latency(engine: *mut IVEngineClient) -> libc::c_float;
+	pub fn get_netchannel_sendnetmsg_trampoline() -> *const ();
+	pub fn get_hooked_getusercmd() -> *const ();
+	pub fn ismousedown() -> bool;
+	
+	pub fn calc_seed_from_command_number(cmdnum: libc::c_int) -> libc::c_int;
 }

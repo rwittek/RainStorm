@@ -6,12 +6,16 @@ use alloc;
 use core;
 use GamePointers;
 
+pub mod forceattack;
 pub mod triggerbot;
 pub mod speedhack;
 pub mod cvarunlocker;
 pub mod namechanger;
 pub mod aimbot;
- 
+pub mod nocmd;
+pub mod nospread;
+pub mod airstuck;
+
 pub static mut CHEAT_MANAGER: *mut CheatManager = 0 as *mut CheatManager;
 
 pub fn cheatmgr_setup() {
@@ -54,23 +58,31 @@ pub struct CheatManager {
 
 impl CheatManager {
 	pub fn new() -> CheatManager {
+		let forceattack: Box<forceattack::ForceAttack> = box Cheat::new();
 		let triggerbot: Box<triggerbot::Triggerbot> = box Cheat::new();
 		let cvarunlocker: Box<cvarunlocker::CvarUnlocker> = box Cheat::new();
 		let speedhack: Box<speedhack::Speedhack> = box Cheat::new();
 		let namechanger: Box<namechanger::NameChanger> = box Cheat::new();
 		let aimbot: Box<aimbot::Aimbot> = box Cheat::new();
-		
+		let nocmd: Box<nocmd::NoCmd> = box Cheat::new();
+		let nospread: Box<nospread::NoSpread> = box Cheat::new();
+		let airstuck: Box<airstuck::Airstuck> = box Cheat::new();
+
 		let mut mgr = CheatManager { 
 			cheats: Vec::new(),
 			
 			ptrs: GamePointers::load()
 		};
-
+		
+		mgr.cheats.push(forceattack);
+		mgr.cheats.push(nospread);
 		mgr.cheats.push(cvarunlocker);
 		mgr.cheats.push(aimbot);
 		mgr.cheats.push(triggerbot);
 		mgr.cheats.push(speedhack);
 		mgr.cheats.push(namechanger);
+		mgr.cheats.push(nocmd);
+		mgr.cheats.push(airstuck);
 		mgr
 	}
 	pub fn handle_command(&mut self, command: &str, arguments: &[&str]) {

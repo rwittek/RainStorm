@@ -71,6 +71,8 @@ pub static mut REAL_INIT: *const () = 0 as *const();
 #[no_mangle]
 pub static mut REAL_CREATEMOVE: *const () = 0 as *const ();
 #[no_mangle]
+pub static mut REAL_NETCHANNEL_SENDNETMSG: *const () = 0 as *const ();
+#[no_mangle]
 pub static mut CINPUT_PTR: *mut sdk::CInput = 0 as *mut sdk::CInput;
 
 struct CString(*const libc::c_char);
@@ -191,15 +193,14 @@ pub unsafe extern "C" fn rainstorm_postinithook() {
 }
 
 #[no_mangle]
-pub extern "C" fn rainstorm_process_usercmd(cmd: &mut sdk::CUserCmd) {
-	unsafe {
-		if cheats::CHEAT_MANAGER.is_not_null() {
-			(*cheats::CHEAT_MANAGER).process_usercmd(cmd);
-		} else {
-			log!("Cheat manager not found!\n");
-			libc::exit(1);
-		};
-	}
+pub unsafe extern "C" fn rainstorm_process_usercmd(cmd: &mut sdk::CUserCmd) {
+	if cheats::CHEAT_MANAGER.is_not_null() {
+		maybe_hook_inetchannel((*cheats::CHEAT_MANAGER).get_gamepointers());
+		(*cheats::CHEAT_MANAGER).process_usercmd(cmd);
+	} else {
+		log!("Cheat manager not found!\n");
+		libc::exit(1);
+	};
 }
 #[no_mangle]
 pub extern "C" fn rainstorm_command_cb(c_arguments: *const libc::c_char) {
@@ -231,14 +232,43 @@ pub extern "C" fn rainstorm_init(log_fd: libc::c_int, hooked_init_trampoline: *c
 		
 		ibaseclientdll_hooker.hook(0, hooked_init_trampoline);
 		ibaseclientdll_hooker.hook(21, hooked_createmove_trampoline);
-		
-		ibaseclientdll_hooker
 	};
 	
 
-	unsafe { CINPUT_PTR = locate_cinput().unwrap() };
+	unsafe {
+		CINPUT_PTR = locate_cinput().unwrap();
+		let mut hooker = vmthook::VMTHooker::new(CINPUT_PTR as *mut *const ());
+		hooker.hook(8, sdk::get_hooked_getusercmd())
+	
+	};
 }
 
+/// If we haven't seen this INetChannel before, hook it.
+fn maybe_hook_inetchannel(ptrs: &GamePointers) {
+	return;
+	
+	static mut LAST_NETCHANNEL: Option<*mut sdk::INetChannel> = None;
+	
+	unsafe {
+		let mut inetchannel = sdk::get_current_inetchannel(ptrs.ivengineclient);
+	
+		let is_new_channel = match LAST_NETCHANNEL {
+			Some(last) => { inetchannel != last },
+			None => true
+		};
+		LAST_NETCHANNEL = Some(inetchannel);
+		
+		if !is_new_channel {
+			log!("Not patching old netchannel");
+			return;
+		}
+		
+		let mut hooker = vmthook::VMTHooker::new(inetchannel as *mut *const ());
+		REAL_NETCHANNEL_SENDNETMSG = hooker.get_orig_method(40);
+		hooker.hook(40, ::sdk::get_netchannel_sendnetmsg_trampoline() as *const ());
+		
+	};
+}
 #[lang = "stack_exhausted"] extern fn stack_exhausted() {}
 #[lang = "eh_personality"] extern fn eh_personality() {}
 
