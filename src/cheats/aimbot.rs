@@ -3,6 +3,25 @@ use sdk;
 use core;
 use core::prelude::*;
 
+#[deriving(Show)]
+pub enum AimbotTargetType {
+	Player,
+	Sentry,
+	Teleporter,
+	/* poot */ Dispenser /* here */
+}
+fn get_target_type(ptrs: &GamePointers, ent: &sdk::C_BaseEntity) -> Option<AimbotTargetType> {
+	let classname = ent.get_classname();
+	
+	match classname {
+		"CTFPlayer" => Some(Player),
+		"CObjectSentrygun" => Some(Sentry),
+		"CObjectTeleporter" => Some(Teleporter),
+		"CObjectDispenser" => Some(Dispenser),
+		_ => None
+	}
+}
+
 pub struct Aimbot {
 	enabled: bool,
 	hitbox: Option<i32>,
@@ -42,34 +61,46 @@ impl Aimbot {
 		
 		let mut tempangles = sdk::QAngle { pitch: 0.0, yaw: 0.0, roll: 0.0 };
 		
-		::utils::map_all_players(ptrs.icliententitylist, |ptr| {
-			if unsafe { (*ptr).get_team() == me.get_team() } {
-				// teammates
-				return;
-			}
-			if unsafe { (*ptr).get_life_state() != 0} {
-				//log!("Entity is dead: {}\n", unsafe { *((*ptr).ptr_offset::<i8>(0x00A1)) });
-				return;
-			}
+		for (ptr, targtype) in ::utils::EntityIterator::new(unsafe { &*ptrs.icliententitylist })
+				.map(|ptr| (ptr, get_target_type(ptrs, unsafe {&*ptr})))
+				.filter_map(|(ptr, maybe_targtype)| {
+					match maybe_targtype {
+						Some(targtype) => Some((ptr, targtype)),
+						None => None
+					}
+				})
+				.filter(|&(ptr, targtype)| unsafe { (*ptr).get_team() != me.get_team() }) // only enemies
+				.filter(|&(ptr, targtype)| unsafe { (*ptr).get_life_state() == 0 }) { // only alive entities
 			
-			let pos: sdk::Vector = match self.hitbox {
-				Some(hitbox) => {
-					let mut pos = sdk::Vector { x: 0.0, y: 0.0, z: 0.0 };
+
+			//log!("Checking a {}\n", targtype);
+			let pos: sdk::Vector = match targtype {
+				Player => { match self.hitbox {
+					Some(hitbox) => {
+						let mut pos = sdk::Vector { x: 0.0, y: 0.0, z: 0.0 };
+						unsafe {
+							sdk::c_baseanimating_gethitboxposition(&*(ptr as *const sdk::C_BaseAnimating), ptrs.ivmodelinfo, hitbox,
+								&mut pos, viewangles)
+						};
+						pos
+					},
+					None => { unsafe {
+							(*ptr).worldspacecenter()
+					} }
+				}},
+				Sentry | Teleporter | Dispenser => {
 					unsafe {
-						sdk::c_baseanimating_gethitboxposition(&*(ptr as *const sdk::C_BaseAnimating), ptrs.ivmodelinfo, hitbox, &mut pos, viewangles)
-					};
-					pos
-				},
-				None => { unsafe {
 						(*ptr).worldspacecenter()
-				} }
+					}
+				},
+				
 			};
 			let aimvec = pos - eyes;
 			unsafe { sdk::vector_angles(&aimvec, &mut tempangles) };
 			// can we actually see this?
 			if !::utils::should_shoot(ivengineclient, icliententitylist, ienginetrace, &tempangles, None) {
 				// can't see it
-				return;
+				continue;
 			}
 			// TODO: priority
 			let dist = (aimvec).length();
@@ -78,7 +109,7 @@ impl Aimbot {
 				maxdist = dist;
 				best_targ = Some(pos);
 			}
-		});
+		}
 		
 		best_targ
 		/*match best_targ {

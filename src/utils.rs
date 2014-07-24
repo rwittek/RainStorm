@@ -6,16 +6,17 @@ use core;
 pub fn should_shoot(ivengineclient: &sdk::IVEngineClient, icliententitylist: &sdk::IClientEntityList,
 		ienginetrace: &sdk::IEngineTrace, viewangles: &sdk::QAngle, hitbox: Option<i32>) -> bool {
 	let mut trace = unsafe { sdk::trace_t::new() };
-	//let filter = sdk::create_tracefilter_from_predicate(should_hit_entity);
-
+	
 	let localplayer_entidx = ivengineclient.get_local_player();
 	let local_baseentity = icliententitylist.get_client_entity(localplayer_entidx);
-	
-	let me: &mut sdk::C_BaseEntity = if local_baseentity.is_not_null() {
+		
+	let me: &sdk::C_BaseEntity = if local_baseentity.is_not_null() {
 		unsafe { core::mem::transmute(local_baseentity) }
 	} else {
-		log!("IClientEntity of local player (id: {}) not found!\n", localplayer_entidx); unsafe { libc::exit(1) }; 
+		quit!("IClientEntity of local player (id: {}) not found!\n", localplayer_entidx); 
 	};
+	//let filter = sdk::create_tracefilter_from_predicate(should_hit_entity);
+
 
 	let mut direction = sdk::Vector::new();
 
@@ -34,12 +35,12 @@ pub fn should_shoot(ivengineclient: &sdk::IVEngineClient, icliententitylist: &sd
 	
 	let ray = sdk::Ray_t::new(&eyes, &direction);
 
-	ienginetrace.trace_ray(&ray, 0x46004001, None, &mut trace);
+	ienginetrace.trace_ray(&ray, 0x46004001, Some(unsafe { &mut *sdk::get_tracefilter(me as *const sdk::C_BaseEntity) }), &mut trace);
 	
 	if trace.base.allsolid  {
 		return false;
 	}
-
+	
 	if  trace.ent.is_not_null() {
 		//log!("Hit hitbox {}, looking for {}\n",trace.hitbox, hitbox);
 		let correct_location = match hitbox {
@@ -47,7 +48,6 @@ pub fn should_shoot(ivengineclient: &sdk::IVEngineClient, icliententitylist: &sd
 			None => true
 		};
 		if correct_location && unsafe {
-					(*trace.ent).get_classname() == "CTFPlayer" &&
 					*((*trace.ent).ptr_offset::<u32>(0x00AC)) != *(me.ptr_offset(0x00AC))
 				}
 		{
@@ -87,20 +87,37 @@ pub fn str_to_integral<T: ::core::num::Int + ::core::num::FromPrimitive>(string:
 	n
 }
 
-pub fn map_all_players(entlist_ptr: *mut ::sdk::IClientEntityList, f: |*mut ::sdk::C_BaseEntity|) {
-	match unsafe { entlist_ptr.to_option() } {
-		Some(entlist) => {
-			for idx in range(1i32, 32) {
-				let maybe_ent_ptr = entlist.get_client_entity(idx);
-				if maybe_ent_ptr.is_not_null() {
-					let classname = unsafe {(*maybe_ent_ptr).get_classname()};
-					//log!("classname: {}\n", classname);
-					if classname == "CTFPlayer" {
-						f(maybe_ent_ptr)
-					}
-				}
+pub struct EntityIterator<'a> {
+	entlist: &'a sdk::IClientEntityList,
+	current_index: i32,
+	stop_at: i32
+}
+impl<'a> EntityIterator<'a> {
+	pub fn new<'a>(entlist: &'a ::sdk::IClientEntityList) -> EntityIterator<'a> {
+		let max_entindex = entlist.get_highest_entity_index();
+		//log!("max entindex: {}\n", max_entindex);
+		EntityIterator {
+			entlist: entlist,
+			current_index: 0,
+			stop_at: max_entindex
+		}
+	}
+}
+
+impl<'a> Iterator<*mut ::sdk::C_BaseEntity> for EntityIterator<'a> {
+	fn next(&mut self) -> Option<*mut ::sdk::C_BaseEntity> {
+		while (self.current_index <= self.stop_at) { 
+			let maybe_ent = self.entlist.get_client_entity(self.current_index);
+			self.current_index += 1;
+
+			if maybe_ent.is_null() {
+				continue
+			} else {
+				return Some(maybe_ent);
 			}
-		},
-		None => ()
+		}
+		// if we fell through here, we have reached the end
+		// rest in peperonis
+		None
 	}
 }

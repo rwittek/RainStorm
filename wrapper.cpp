@@ -780,17 +780,40 @@ extern "C" void ienginetrace_traceray(IEngineTrace *enginetrace, const Ray_t &ra
 }
 class TriggerbotTraceFilter : public ITraceFilter
 {
-	bool (__cdecl * predicate)(IHandleEntity *ent);
     virtual bool ShouldHitEntity( IHandleEntity *pEntity, int contentsMask );
     virtual TraceType_t  GetTraceType() const;
 };
 bool TriggerbotTraceFilter::ShouldHitEntity( IHandleEntity* pHandle, int contentsMask )
 {
-    return predicate(pHandle);
+    CBaseEntity* pEnt = static_cast<CBaseEntity*>( pHandle );
+
+    // Huge Credits: Casual_Hacker, I had copied all the code he provided.
+    ClientClass* pEntCC = pEnt->GetClientClass();
+    const char* ccName = pEntCC->GetName();
+	//fprintf(logfile, "%s\n", ccName);
+	if (strcmp(ccName, "CTFPlayer") == 0) {
+		return true;
+	}
+    if ( strcmp(ccName, "CFuncRespawnRoomVisualizer") || strcmp(ccName, "CTFMedigunShield") ||
+        strcmp(ccName,"CFuncAreaPortalWindow"))
+    {
+        return false;
+    }
+
+    if ( pEnt == dynamic_cast<C_BaseEntity*>(getptr_icliententitylist()->GetClientEntity(rainstorm_getivengineclient()->GetLocalPlayer( ) )) )
+    {
+        return false;
+    }
+
+    return true;
 }
 TraceType_t TriggerbotTraceFilter::GetTraceType() const
 {
     return TRACE_EVERYTHING;
+}
+TriggerbotTraceFilter global_filter;
+extern "C" ITraceFilter *get_tracefilter(C_BaseEntity *me) {
+	return &global_filter;
 }
 extern "C" const char *c_baseentity_getclassname(C_BaseEntity *ent) {
 	ClientClass* pEntCC = ent->GetClientClass();
@@ -803,4 +826,7 @@ extern "C" bool ismousedown() {
 
 extern "C" int calc_seed_from_command_number(int commandnum) {
 	return MD5_PseudoRandom( commandnum ) & 0x7fffffff;
+}
+extern "C" int icliententitylist_get_highest_entity_index(IClientEntityList *entlist) {
+	return entlist->GetHighestEntityIndex();
 }

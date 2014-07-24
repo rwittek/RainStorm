@@ -28,6 +28,7 @@ pub enum IEngineTrace {}
 pub enum IVModelInfo {}
 pub enum INetChannel {}
 pub enum INetMessage {}
+pub enum ITraceFilter {}
 
 pub static IN_ATTACK: libc::c_int = (1 << 0);
 pub static IN_JUMP: libc::c_int = (1 << 1);
@@ -230,11 +231,14 @@ impl IClientEntityList {
 	pub fn get_client_entity(&self, entidx: libc::c_int) -> *mut C_BaseEntity {
 		unsafe {icliententitylist_getcliententity(self, entidx) }
 	}
+	pub fn get_highest_entity_index(&self) -> libc::c_int {
+		unsafe { icliententitylist_get_highest_entity_index(self) }
+	}
 }
 impl IEngineTrace {
-	pub fn trace_ray(&self, ray: &Ray_t, mask: u32, filter: Option<&mut IEngineTrace>, trace: &mut trace_t) {
+	pub fn trace_ray(&self, ray: &Ray_t, mask: u32, filter: Option<&mut ITraceFilter>, trace: &mut trace_t) {
 		let filter_ptr = match filter {
-			Some(ptr) => ptr as *mut IEngineTrace,
+			Some(ptr) => ptr as *mut ITraceFilter,
 			None => core::ptr::mut_null()
 		};
 		unsafe { ienginetrace_traceray(self, ray, mask, filter_ptr, trace) };
@@ -292,10 +296,11 @@ extern "C" {
 	fn ivengineclient_setviewangles(engine: &mut IVEngineClient, angles: &QAngle);
 
 	pub fn getptr_ienginetrace() -> * mut IEngineTrace; // MAYBE NULL
-	fn ienginetrace_traceray(enginetrace: &IEngineTrace, ray: &Ray_t, mask: u32, filter: *mut IEngineTrace, trace: &mut trace_t);
+	fn ienginetrace_traceray(enginetrace: &IEngineTrace, ray: &Ray_t, mask: u32, filter: *mut ITraceFilter, trace: &mut trace_t);
 	
 	pub fn getptr_icliententitylist() -> * mut IClientEntityList; // MAYBE NULL
 	fn icliententitylist_getcliententity(cliententitylist: *const IClientEntityList, entidx: libc::c_int) -> *mut C_BaseEntity;
+	fn icliententitylist_get_highest_entity_index(entlist: *const IClientEntityList) -> libc::c_int;
 	
 	pub fn getptr_ibaseclientdll() -> * mut IBaseClientDLL; // MAYBE NULL
 	pub fn getptr_icvar(app_sys_factory: * mut AppSysFactory) -> * mut ICvar;
@@ -330,4 +335,5 @@ extern "C" {
 	pub fn ismousedown() -> bool;
 	
 	pub fn calc_seed_from_command_number(cmdnum: libc::c_int) -> libc::c_int;
+	pub fn get_tracefilter(me: *const C_BaseEntity) -> *mut ITraceFilter;
 }
