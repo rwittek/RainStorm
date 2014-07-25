@@ -313,6 +313,11 @@ impl C_BaseAnimating {
 			raw::c_baseanimating_getnumbones(self.get_ptr(), modelinfo.get_ptr())
 		}
 	}
+	pub fn get_num_hitboxes(&self, modelinfo: IVModelInfo) -> libc::c_int {
+		unsafe {
+			raw::c_baseanimating_getnumhitboxes(self.get_ptr(), modelinfo.get_ptr())
+		}
+	}
 }
 impl IBaseClientDLL {
 	pub unsafe fn get_ptr(&self) -> raw::IBaseClientDLLPtr {

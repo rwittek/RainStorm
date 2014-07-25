@@ -774,6 +774,20 @@ extern "C" int c_baseanimating_getnumbones(C_BaseAnimating *ent, IVModelInfo *mo
 		return 0;
 	}
 }
+extern "C" int c_baseanimating_getnumhitboxes(C_BaseAnimating *ent, IVModelInfo *modelinfo) {
+	studiohdr_t *pStudioHdr = modelinfo->GetStudiomodel( ent->GetModel( ) );
+	if (pStudioHdr) {
+		mstudiohitboxset_t *set =pStudioHdr->pHitboxSet( ent->m_nHitboxSet );
+		if ( set  )
+		{
+			return set-> numhitboxes;
+		} else {
+			return 0;
+		}
+	} else {
+		return 0;
+	}
+}
 extern "C" void ivengineclient_setviewangles(IVEngineClient *eng, QAngle &ang) {
 	eng->SetViewAngles(ang);
 }

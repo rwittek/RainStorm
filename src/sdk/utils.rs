@@ -74,24 +74,24 @@ impl Iterator<C_BaseEntity> for EntityIterator {
 	}
 }
 
-pub struct BonePositionIterator {
+pub struct HitboxPositionIterator {
 	ent: C_BaseAnimating,
 	modelinfo: sdk::IVModelInfo,
-	current_bone: libc::c_int,
-	num_bones: libc::c_int
+	current_hitbox: libc::c_int,
+	num_hitboxes: libc::c_int
 }
-impl BonePositionIterator {
-	pub fn new(ent: C_BaseAnimating, modelinfo: sdk::IVModelInfo) -> BonePositionIterator {
-		BonePositionIterator { ent: ent, modelinfo: modelinfo, current_bone: 0, num_bones: ent.get_num_bones(modelinfo) }
+impl HitboxPositionIterator {
+	pub fn new(ent: C_BaseAnimating, modelinfo: sdk::IVModelInfo) -> HitboxPositionIterator {
+		HitboxPositionIterator { ent: ent, modelinfo: modelinfo, current_hitbox: 0, num_hitboxes: ent.get_num_hitboxes(modelinfo) }
 	}
 }
-impl Iterator<sdk::Vector> for BonePositionIterator {
+impl Iterator<sdk::Vector> for HitboxPositionIterator {
 	fn next(&mut self) -> Option<sdk::Vector> {
-		if self.current_bone >= self.num_bones {
+		if self.current_hitbox == self.num_hitboxes {
 			None
 		} else {
-			let pos = self.ent.get_bone_position(self.modelinfo, self.current_bone);
-			self.current_bone += 1;
+			let pos = self.ent.get_hitbox_position(self.modelinfo, self.current_hitbox);
+			self.current_hitbox += 1;
 			Some(pos)
 		}
 	}

@@ -106,8 +106,8 @@ impl Aimbot {
 								prioritize(hitbox_pos, ent, targtype)
 							},
 							None => {
-								for bone_pos in sdk::utils::BonePositionIterator::new(baseanimating, ptrs.ivmodelinfo) {
-									prioritize(bone_pos, ent, targtype)
+								for hitbox_pos in sdk::utils::HitboxPositionIterator::new(baseanimating, ptrs.ivmodelinfo) {
+									prioritize(hitbox_pos, ent, targtype)
 								}
 							}
 						}
