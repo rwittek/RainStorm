@@ -12,23 +12,7 @@ use core::ptr::RawPtr;
 
 pub use CString;
 
-pub struct IVEngineClientPtr (*mut ());
-pub struct IBaseClientDLLPtr (*mut ());
-pub struct ConVarPtr (*mut ());
-pub struct ICvarPtr (*mut ());
-pub struct AppSysFactoryPtr (*mut ());
-pub struct PhysicsFactoryPtr (*mut ());
-pub struct GlobalsPtr (*mut ());
-pub struct CInputPtr (*mut ());
-pub struct C_BaseEntityPtr (*mut ());
-pub struct C_BaseAnimatingPtr (*mut ());
-pub struct IHandleEntityPtr (*mut ());
-pub struct IClientEntityListPtr (*mut ());
-pub struct IEngineTracePtr (*mut ());
-pub struct IVModelInfoPtr (*mut ());
-pub struct INetChannelPtr (*mut ());
-pub struct INetMessagePtr (*mut ());
-pub struct ITraceFilterPtr (*mut ());
+mod raw;
 
 pub static IN_ATTACK: libc::c_int = (1 << 0);
 pub static IN_JUMP: libc::c_int = (1 << 1);
@@ -139,7 +123,7 @@ impl Ray_t {
 	}
 }
 impl C_BaseEntity {
-	pub fn get_origin(self) -> Vector {
+	pub fn get_origin(&self) -> Vector {
 		unsafe { c_baseentity_getorigin(self) }
 	}
 	pub fn worldspacecenter(&self) -> Vector {
@@ -287,53 +271,4 @@ impl ICvar {
 	}
 }
 
-extern "C" {
-	pub fn getptr_ivengineclient() -> * mut IVEngineClient; // MAYBE NULL
-	fn ivengineclient_clientcmd(engine: & mut IVEngineClient, cmd_string: * const c_char);
-	fn ivengineclient_time(engine: &mut IVEngineClient) -> libc::c_float;
-	fn ivengineclient_getlocalplayer(engine: &IVEngineClient) -> libc::c_int;
-	fn ivengineclient_getplayername(eng: *const IVEngineClient, ent: *const C_BaseEntity, buf: *mut u8, bufsize: libc::size_t) -> libc::size_t;
-	fn ivengineclient_setviewangles(engine: &mut IVEngineClient, angles: &QAngle);
 
-	pub fn getptr_ienginetrace() -> * mut IEngineTrace; // MAYBE NULL
-	fn ienginetrace_traceray(enginetrace: &IEngineTrace, ray: &Ray_t, mask: u32, filter: *mut ITraceFilter, trace: &mut trace_t);
-	
-	pub fn getptr_icliententitylist() -> * mut IClientEntityList; // MAYBE NULL
-	fn icliententitylist_getcliententity(cliententitylist: *const IClientEntityList, entidx: libc::c_int) -> *mut C_BaseEntity;
-	fn icliententitylist_get_highest_entity_index(entlist: *const IClientEntityList) -> libc::c_int;
-	
-	pub fn getptr_ibaseclientdll() -> * mut IBaseClientDLL; // MAYBE NULL
-	pub fn getptr_icvar(app_sys_factory: * mut AppSysFactory) -> * mut ICvar;
-	
-	pub fn trace_t_gethitgroup(trace: *const trace_t) -> libc::c_int;
-	fn c_baseentity_getorigin(ent: *const C_BaseEntity) -> Vector;
-	fn c_baseentity_worldspacecenter(ent: *const C_BaseEntity) -> Vector;
-	fn c_baseentity_getindex(ent: *const C_BaseEntity) -> libc::c_int;
-	fn c_baseentity_getclassname(ent: *const C_BaseEntity) -> *const libc::c_char;
-	
-	pub fn getptr_ivmodelinfo() -> *mut IVModelInfo;
-	
-	pub fn c_baseanimating_gethitboxposition(ent: &C_BaseAnimating, modelinfo: *mut IVModelInfo, hitbox: libc::c_int, org: &mut Vector, angles: &QAngle);
-	pub fn getptr_cinput(client: *mut IBaseClientDLL) -> *mut CInput;
-	fn icvar_findvar(icvar: * const ICvar, name: * const char) -> * mut ConVar; // MAYBE NULL;
-	pub fn convar_setvalue_raw_int(cvar: * mut ConVar, value: libc::c_int);
-	pub fn convar_setvalue_str(cvar: * mut ConVar, value: CString);
-	pub fn convar_clearflags(cvar: * mut ConVar);
-	pub fn convar_changeandfreeze(cvar: * mut ConVar, newval: CString);
-	
-	pub fn angle_vectors(angle: &QAngle, vec1: *mut Vector, vec2: *mut Vector, vec3: *mut Vector);
-	pub fn vector_angles(vector: &Vector, angles: &mut QAngle);
-	pub fn vector_length(vector: &Vector) -> libc::c_float;
-	pub fn ray_t_init(ray: &mut Ray_t, start: &Vector, end: &Vector);
-	
-	pub fn create_tracefilter_from_predicate(predicate: extern "C" fn(ent: *const IHandleEntity, contentsmask: i32) -> bool) -> PredicateTraceFilter;
-	
-	pub fn get_current_inetchannel(engine: *mut IVEngineClient) -> *mut INetChannel;
-	pub fn get_current_latency(engine: *mut IVEngineClient) -> libc::c_float;
-	pub fn get_netchannel_sendnetmsg_trampoline() -> *const ();
-	pub fn get_hooked_getusercmd() -> *const ();
-	pub fn ismousedown() -> bool;
-	
-	pub fn calc_seed_from_command_number(cmdnum: libc::c_int) -> libc::c_int;
-	pub fn get_tracefilter(me: *const C_BaseEntity) -> *mut ITraceFilter;
-}
