@@ -54,16 +54,14 @@ impl Aimbot {
 			eyes.y += (eye_offsets)[1];
 			eyes.z += (eye_offsets)[2];
 		}
-		let mut max_priority = core::i32::MIN; // this is signed
+		let mut max_priority = core::f32::MIN_VALUE; // this is signed
 		let mut best_targ: Option<sdk::Vector> = None;
 		
 		let mut ivengineclient = unsafe { ptrs.ivengineclient.to_option().unwrap() };
 		let mut icliententitylist = unsafe { ptrs.icliententitylist.to_option().unwrap() };
 		let mut ienginetrace = unsafe { ptrs.ienginetrace.to_option().unwrap() };
 		
-		let mut tempangles = sdk::QAngle { pitch: 0.0, yaw: 0.0, roll: 0.0 };
-		
-		for (ptr, targtype) in ::utils::EntityIterator::new(unsafe { &*ptrs.icliententitylist })
+		for (ptr, targtype) in sdk::utils::EntityIterator::new(ptrs.icliententitylist)
 				.map(|ptr| (ptr, get_target_type(ptrs, unsafe {&*ptr})))
 				.filter_map(|(ptr, maybe_targtype)| {
 					match maybe_targtype {
@@ -81,7 +79,8 @@ impl Aimbot {
 					Some(hitbox) => {
 						let mut pos = sdk::Vector { x: 0.0, y: 0.0, z: 0.0 };
 						unsafe {
-							sdk::c_baseanimating_gethitboxposition(&*(ptr as *const sdk::C_BaseAnimating), ptrs.ivmodelinfo, hitbox,
+							let baseanimating = sdk::C_BaseAnimating::from_ptr(core::mem::transmute(ptr));
+							baseanimating.get_hitbox_position(ptrs.ivmodelinfo, hitbox,
 								&mut pos, viewangles)
 						};
 						pos
@@ -98,9 +97,9 @@ impl Aimbot {
 				
 			};
 			let aimvec = pos - eyes;
-			unsafe { sdk::vector_angles(&aimvec, &mut tempangles) };
+			let mut tempangles = aimvec.to_angle();
 			// can we actually see this?
-			match ::utils::trace_to_entity(ivengineclient, icliententitylist, ienginetrace, &tempangles) {
+			match sdk::utils::trace_to_entity(ivengineclient, icliententitylist, ienginetrace, &tempangles) {
 				Some(trace_ent) if trace_ent == ptr => (), // OK
 				Some(trace_ent) => {
 					continue;
@@ -111,10 +110,10 @@ impl Aimbot {
 			}
 
 			let dist = (aimvec).length();
-			let health = unsafe { (*ptr).get_health() };
-			if dist < maxdist {
+			let priority = -dist;
+			if priority < max_priority {
 				//log!("target: {}, {}, {}", unsafe {(*ptr).get_index()}, pos, dist);
-				maxdist = dist;
+				max_priority = priority;
 				best_targ = Some(pos);
 			}
 		}
@@ -179,9 +178,7 @@ impl Aimbot {
 		
 		// interpolate
 		
-		unsafe {
-			sdk::vector_angles(&aimvec, &mut cmd.viewangles);
-		}
+		aimvec.to_angle()
 		
 	}
 }

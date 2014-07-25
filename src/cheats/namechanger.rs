@@ -47,7 +47,7 @@ impl Cheat for NameChanger {
 		// TODO: some smart timer BS
 		
 		// FIXME: ugly string crappery
-		for ptr in ::utils::EntityIterator::new(unsafe {&*ptrs.icliententitylist})
+		for ptr in sdk::utils::EntityIterator::new(unsafe {&*ptrs.icliententitylist})
 				.filter(|ptr| unsafe { (**ptr).get_classname() == "CTFPlayer" }) {
 			let mut buf = [0u8, ..300];
 			let len = unsafe { ptrs.ivengineclient.to_option().unwrap() }.get_player_name(unsafe {&*ptr}, buf.as_mut_slice());

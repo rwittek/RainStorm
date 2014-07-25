@@ -1,24 +1,56 @@
 use libc;
+use core::prelude::*;
 use super::{trace_t, Ray_t, Vector, QAngle};
 use CString;
- 
-pub struct IVEngineClientPtr (*mut ());
-pub struct IBaseClientDLLPtr (*mut ());
-pub struct ConVarPtr (*mut ());
-pub struct ICvarPtr (*mut ());
-pub struct AppSysFactoryPtr (*mut ());
-pub struct PhysicsFactoryPtr (*mut ());
-pub struct GlobalsPtr (*mut ());
-pub struct CInputPtr (*mut ());
-pub struct C_BaseEntityPtr (*mut ());
-pub struct C_BaseAnimatingPtr (*mut ());
-pub struct IHandleEntityPtr (*mut ());
-pub struct IClientEntityListPtr (*mut ());
-pub struct IEngineTracePtr (*mut ());
-pub struct IVModelInfoPtr (*mut ());
-pub struct INetChannelPtr (*mut ());
-pub struct INetMessagePtr (*mut ());
-pub struct ITraceFilterPtr (*mut ());
+use core;
+
+// the lifetime of these is "hopefully long enough"
+macro_rules! ptr_wrapper(
+	($name:ident) => (
+		#[deriving(Show)]
+		pub struct $name (*mut ());
+		impl core::cmp::PartialEq for $name {
+			fn eq(&self, other: &$name) -> bool {
+				let &$name(ref selfptr) = self;
+				let &$name(ref otherptr) = other;
+				selfptr == otherptr
+			}
+		}
+		impl $name {
+			fn null() -> $name {
+				$name(core::ptr::RawPtr::null())
+			}
+			fn is_null(&self) -> bool {
+				self == &$name::null()
+			}
+			fn is_not_null(&self) -> bool {
+				self != &$name::null()
+			}
+			fn to_uint(&self) -> uint {
+				let &$name(ref ptr) = self;
+				(*ptr) as uint
+			}
+		}
+	)
+)
+
+ptr_wrapper!(IVEngineClientPtr)
+ptr_wrapper!(IBaseClientDLLPtr)
+ptr_wrapper!(ConVarPtr)
+ptr_wrapper!(ICvarPtr)
+ptr_wrapper!(AppSysFactoryPtr)
+ptr_wrapper!(PhysicsFactoryPtr)
+ptr_wrapper!(GlobalsPtr)
+ptr_wrapper!(CInputPtr)
+ptr_wrapper!(C_BaseEntityPtr)
+ptr_wrapper!(C_BaseAnimatingPtr)
+ptr_wrapper!(IHandleEntityPtr)
+ptr_wrapper!(IClientEntityListPtr)
+ptr_wrapper!(IEngineTracePtr)
+ptr_wrapper!(IVModelInfoPtr)
+ptr_wrapper!(INetChannelPtr)
+ptr_wrapper!(INetMessagePtr)
+ptr_wrapper!(ITraceFilterPtr)
 
 extern "C" {
 	pub fn getptr_ivengineclient() -> IVEngineClientPtr; // MAYBE NULL

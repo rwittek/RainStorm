@@ -6,9 +6,7 @@ use alloc;
 use core;
 use GamePointers;
 
-pub mod forceattack;
 pub mod triggerbot;
-pub mod speedhack;
 pub mod cvarunlocker;
 pub mod namechanger;
 pub mod aimbot;
@@ -58,7 +56,6 @@ pub struct CheatManager {
 
 impl CheatManager {
 	pub fn new() -> CheatManager {
-		let forceattack: Box<forceattack::ForceAttack> = box Cheat::new();
 		let triggerbot: Box<triggerbot::Triggerbot> = box Cheat::new();
 		let cvarunlocker: Box<cvarunlocker::CvarUnlocker> = box Cheat::new();
 		let namechanger: Box<namechanger::NameChanger> = box Cheat::new();
@@ -73,7 +70,6 @@ impl CheatManager {
 			ptrs: GamePointers::load()
 		};
 		
-		mgr.cheats.push(forceattack);
 		mgr.cheats.push(nospread);
 		mgr.cheats.push(cvarunlocker);
 		mgr.cheats.push(aimbot);
@@ -114,15 +110,10 @@ impl CheatManager {
 		}
 	}
 	// Wrappers that run all the cheats' methods
-	pub fn preinit(&mut self, appsysfactory: *mut sdk::AppSysFactory) {
-		self.ptrs.appsysfactory = appsysfactory;
+	pub unsafe fn preinit(&mut self, appsysfactory: sdk::AppSysFactoryPtr) {
+		self.ptrs.appsysfactory = Some(sdk::AppSysFactory::from_ptr(appsysfactory));
 		
-		let icvar_ptr = unsafe { sdk::getptr_icvar(appsysfactory) };
-		if icvar_ptr.is_not_null() {
-			self.ptrs.icvar = icvar_ptr;
-		} else {
-			quit!("ICvar null?\n");
-		}
+		self.ptrs.icvar = Some( sdk::get_icvar(appsysfactory) );
 		
 		for cheat in self.cheats.mut_iter() {
 			cheat.preinit(&self.ptrs);

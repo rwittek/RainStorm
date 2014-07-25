@@ -12,9 +12,6 @@ pub struct Triggerbot {
 	smoothing_state: u32
 }
 
-extern "C" fn should_hit_entity(ent: *const sdk::IHandleEntity, contentsmask: i32) -> bool {
-	false
-}
 impl Cheat for Triggerbot {
 	fn new() -> Triggerbot {
 		Triggerbot { enabled: false, smoothing: 0, smoothing_state: 0 }

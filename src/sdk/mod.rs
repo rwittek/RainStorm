@@ -1,6 +1,9 @@
 #![allow(non_camel_case_types)]
 #![allow(dead_code)]
 pub use libc::c_char;
+pub use self::raw::calc_seed_from_command_number;
+pub use self::raw::get_hooked_getusercmd;
+pub use self::raw::{AppSysFactoryPtr};
 use libc;
 use core;
 use core::result::{Result, Ok, Err};
@@ -10,9 +13,16 @@ use core::raw::Repr;
 use core::mem::transmute;
 use core::ptr::RawPtr;
 
+
+
 pub use CString;
 
-mod raw;
+pub mod raw;
+pub mod utils;
+
+pub struct C_BaseAnimating {
+	ptr: raw::C_BaseAnimatingPtr
+}
 
 pub struct C_BaseEntity {
 	ptr: raw::C_BaseEntityPtr
@@ -20,6 +30,87 @@ pub struct C_BaseEntity {
 
 pub struct ITraceFilter {
 	ptr: raw::ITraceFilterPtr
+}
+
+pub struct IVModelInfo {
+	ptr: raw::IVModelInfoPtr
+}
+pub struct AppSysFactory {
+	ptr: raw::AppSysFactoryPtr
+}
+pub struct CInput {
+	ptr: raw::CInputPtr
+}
+pub struct IBaseClientDLL {
+	ptr: raw::IBaseClientDLLPtr
+}
+pub struct ICvar {
+	ptr: raw::ICvarPtr
+}
+pub struct IVEngineClient {
+	ptr: raw::IVEngineClientPtr
+}
+pub struct IClientEntityList {
+	ptr: raw::IClientEntityListPtr
+}
+pub struct IEngineTrace {
+	ptr: raw::IEngineTracePtr
+}
+pub struct ConVar {
+	ptr: raw::ConVarPtr
+}
+
+
+pub fn get_icvar(appsysfactory: &AppSysFactory) -> ICvar {
+	let ptr = unsafe { raw::getptr_icvar(appsysfactory.get_ptr()) };
+	if ptr.is_not_null() {
+		return unsafe { ICvar::from_ptr(ptr) };
+	} else {
+		quit!("getptr_icvar returned NULL!\n");
+	}
+}
+pub fn get_ivengineclient() -> IVEngineClient {
+	let ptr = unsafe { raw::getptr_ivengineclient() };
+	if ptr.is_not_null() {
+		return unsafe { IVEngineClient::from_ptr(ptr) };
+	} else {
+		quit!("getptr_ivengineclient returned NULL!\n");
+	}
+}
+pub fn get_icliententitylist() -> IClientEntityList {
+	let ptr = unsafe { raw::getptr_icliententitylist() };
+	if ptr.is_not_null() {
+		return unsafe { IClientEntityList::from_ptr(ptr) };
+	} else {
+		quit!("getptr_icliententitylist returned NULL!\n");
+	}
+}
+pub fn get_ibaseclientdll() -> IBaseClientDLL {
+	let ptr = unsafe { raw::getptr_ibaseclientdll() };
+	if ptr.is_not_null() {
+		return unsafe { IBaseClientDLL::from_ptr(ptr) };
+	} else {
+		quit!("getptr_ibaseclientdll returned NULL!\n");
+	}
+}
+pub fn get_ienginetrace() -> IEngineTrace {
+	let ptr = unsafe { raw::getptr_ienginetrace() };
+	if ptr.is_not_null() {
+		return unsafe { IEngineTrace::from_ptr(ptr) };
+	} else {
+		quit!("getptr_ienginetrace returned NULL!\n");
+	}
+}
+pub fn get_ivmodelinfo() -> IVModelInfo {
+	let ptr = unsafe { raw::getptr_ivmodelinfo() };
+	if ptr.is_not_null()	{
+		return unsafe { IVModelInfo::from_ptr(ptr) };
+	} else {
+		quit!("getptr_ivmodelinfo returned NULL!\n");
+	}
+}
+pub fn get_tracefilter(me: C_BaseEntity) -> ITraceFilter {
+	unsafe { ITraceFilter::from_ptr(raw::get_tracefilter(me.get_ptr())) }
 }
 pub static IN_ATTACK: libc::c_int = (1 << 0);
 pub static IN_JUMP: libc::c_int = (1 << 1);
@@ -62,7 +153,7 @@ pub struct trace_t {
 	surface: csurface_t,
 	pub hitgroup: libc::c_int,
 	pub physicsbone: libc::c_short,
-	pub ent: *mut C_BaseEntity,
+	pub ent: raw::C_BaseEntityPtr,
 	pub hitbox: libc::c_int
 }
 
@@ -115,6 +206,20 @@ pub struct CUserCmd {
 pub struct Ray_t {
 	data: [u8, ..128] //todo: get proper size
 }
+
+impl AppSysFactory {
+	pub fn get_ptr(&self) -> raw::AppSysFactoryPtr {
+		self.ptr
+	}
+	pub unsafe fn from_ptr(ptr: raw::AppSysFactoryPtr) -> AppSysFactory {
+		AppSysFactory { ptr: ptr }
+	}
+}
+impl ITraceFilter {
+	pub unsafe fn from_ptr(ptr: raw::ITraceFilterPtr) -> ITraceFilter {
+		ITraceFilter { ptr: ptr }
+	}
+}
 impl Ray_t {
 	pub fn new(start: &Vector, end: &Vector) -> Ray_t {
 		let mut ray: Ray_t;
@@ -126,14 +231,20 @@ impl Ray_t {
 	}
 }
 impl C_BaseEntity {
+	pub unsafe fn from_ptr(ptr: raw::C_BaseEntityPtr) -> C_BaseEntity {
+		C_BaseEntity { ptr: ptr }
+	}
+	pub fn get_ptr(&self) -> raw::C_BaseEntityPtr {
+		self.ptr
+	} 
 	pub fn get_origin(&self) -> Vector {
-		unsafe { raw::c_baseentity_getorigin(self) }
+		unsafe { raw::c_baseentity_getorigin(self.get_ptr()) }
 	}
 	pub fn worldspacecenter(&self) -> Vector {
-		unsafe { raw::c_baseentity_worldspacecenter(self) }
+		unsafe { raw::c_baseentity_worldspacecenter(self.get_ptr()) }
 	}
 	pub fn get_index(&self) -> libc::c_int {
-		unsafe { raw::c_baseentity_getindex(self) }
+		unsafe { raw::c_baseentity_getindex(self.get_ptr()) }
 	}
 	pub fn get_life_state(&self) -> i8 {
 		unsafe { *(self.ptr_offset::<i8>(0x00A1)) }
@@ -146,16 +257,45 @@ impl C_BaseEntity {
 	}
 	pub fn get_classname<'a>(&'a self) -> &'a str {
 		unsafe {
-			let cstr_classname = raw::c_baseentity_getclassname(self);
+			let cstr_classname = raw::c_baseentity_getclassname(self.get_ptr());
 			// TODO: null check?
 			core::str::raw::c_str_to_static_slice(cstr_classname)
 		}
 	}
 	pub unsafe fn mut_ptr_offset<DataType>(&mut self, offset: uint) -> *mut DataType {
-		(((self as *mut C_BaseEntity as uint) + offset) as *mut DataType)
+		(((self.get_ptr().to_uint()) + offset) as *mut DataType)
 	}
 	pub unsafe fn ptr_offset<DataType>(&self, offset: uint) -> *const DataType {
-		(((self as *const C_BaseEntity as uint) + offset) as *const DataType)
+		(((self.get_ptr().to_uint()) + offset) as *const DataType)
+	}
+}
+impl IVModelInfo {
+	pub unsafe fn get_ptr(&self) -> raw::IVModelInfoPtr {
+		self.ptr
+	}
+	pub unsafe fn from_ptr(ptr: raw::IVModelInfoPtr) -> IVModelInfo {
+		IVModelInfo { ptr: ptr }
+	}
+}
+
+impl C_BaseAnimating {
+	pub unsafe fn from_ptr(ptr: raw::C_BaseAnimatingPtr) -> C_BaseAnimating {
+		C_BaseAnimating { ptr: ptr }
+	}
+	pub unsafe fn get_ptr(&self) -> raw::C_BaseAnimatingPtr {
+		self.ptr
+	}
+	pub fn get_hitbox_position(&self, modelinfo: IVModelInfo, hitbox: libc::c_int,
+			origin: &mut Vector, angles: &QAngle) {
+		raw::c_baseanimating_gethitboxposition(self.get_ptr(), modelinfo.get_ptr(), hitbox, origin, angles);
+	}
+}
+impl IBaseClientDLL {
+	pub unsafe fn get_ptr(&self) -> raw::IBaseClientDLLPtr {
+		self.ptr
+	}
+	pub unsafe fn from_ptr(ptr: raw::IBaseClientDLLPtr) -> IBaseClientDLL {
+		IBaseClientDLL { ptr: ptr }
 	}
 }
 		
@@ -174,6 +314,18 @@ impl Vector {
 	pub fn length(&self) -> f32 {
 		unsafe { raw::vector_length(self) }
 	}
+	pub fn to_angle(&self) -> QAngle {
+		let temp = core::mem::uninitialized();
+		raw::vector_angles(self, &mut temp);
+		temp
+	}
+}
+impl QAngle {
+	pub fn to_vector(&self) -> Vector {
+		let temp = core::mem::uninitialized();
+		raw::angle_vectors(self, &mut temp, core::ptr::mut_null(), core::ptr::mut_null());
+		temp
+	}
 }
 impl core::ops::Add<Vector, Vector> for Vector {
 	fn add(&self, rhs: &Vector) -> Vector {
@@ -186,6 +338,11 @@ impl core::ops::Sub<Vector, Vector> for Vector {
 	}
 }
 impl IVEngineClient {
+	/// ptr MUST be valid!
+	pub unsafe fn from_ptr(ptr: raw::IVEngineClientPtr) -> IVEngineClient {
+		IVEngineClient { ptr: ptr }
+	}
+	
 	pub fn client_cmd(&mut self, command: &'static str) -> Result<(), &'static str> {
 		let mut buf = [0u8, ..256];
 		if command.len() >= buf.len() {
@@ -215,15 +372,36 @@ impl IVEngineClient {
 	}
 }
 impl IClientEntityList {
-	pub fn get_client_entity(&self, entidx: libc::c_int) -> *mut C_BaseEntity {
-		unsafe { raw::icliententitylist_getcliententity(self, entidx) }
+	pub unsafe fn from_ptr(ptr: raw::IClientEntityListPtr) -> IClientEntityList {
+		IClientEntityList { ptr: ptr }
+	}
+	pub fn get_client_entity(&self, entidx: libc::c_int) -> Option<C_BaseEntity> {
+		unsafe {
+			let ptr = raw::icliententitylist_getcliententity(self, entidx);
+			if ptr.is_not_null() {
+				Some(C_BaseEntity::from_ptr(ptr))
+			} else {
+				None
+			}
+		}
 	}
 	pub fn get_highest_entity_index(&self) -> libc::c_int {
 		unsafe { raw::icliententitylist_get_highest_entity_index(self) }
 	}
 }
+impl ICvar {
+	/// ptr MUST be valid!
+	pub unsafe fn from_ptr(ptr: raw::ICvarPtr) -> ICvar {
+		ICvar { ptr: ptr }
+	}
+}
+
 impl IEngineTrace {
-	pub fn trace_ray(&self, ray: &Ray_t, mask: u32, filter: Option<&mut ITraceFilter>, trace: &mut trace_t) {
+	pub unsafe fn from_ptr(ptr: raw::IEngineTracePtr) -> IEngineTrace {
+		IEngineTrace { ptr: ptr }
+	}
+	
+	pub fn trace_ray(&self, ray: &Ray_t, mask: u32, filter: Option<ITraceFilter>, trace: &mut trace_t) {
 		let filter_ptr = match filter {
 			Some(filter) => filter.get_ptr(),
 			None => core::ptr::mut_null()

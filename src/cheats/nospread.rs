@@ -12,9 +12,6 @@ pub struct NoSpread {
 	target_seed: i32,
 }
 
-extern "C" fn should_hit_entity(ent: *const sdk::IHandleEntity, contentsmask: i32) -> bool {
-	false
-}
 // a good command number is 2076615043
 impl Cheat for NoSpread {
 	fn new() -> NoSpread {

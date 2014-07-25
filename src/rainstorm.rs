@@ -15,8 +15,8 @@ pub use collections::Vec;
 use core::raw::Repr;
 
 
-pub mod sdk;
 mod logging;
+pub mod sdk;
 mod vmthook;
 pub mod utils;
 mod cheats;
@@ -92,59 +92,29 @@ impl CString {
 }
 
 #[no_mangle]
-pub extern "C" fn rainstorm_getivengineclient() -> *mut sdk::IVEngineClient {
-	unsafe { (*(cheats::CHEAT_MANAGER)).get_gamepointers().ivengineclient }
+pub extern "C" fn rainstorm_getivengineclient() -> sdk::raw::IVEngineClientPtr {
+	unsafe { (*(cheats::CHEAT_MANAGER)).get_gamepointers().ivengineclient.get_ptr() }
 }
 pub struct GamePointers {
-	ivengineclient: *mut sdk::IVEngineClient,
-	icliententitylist: *mut sdk::IClientEntityList,
-	ibaseclientdll: *mut sdk::IBaseClientDLL,
-	ienginetrace: *mut sdk::IEngineTrace,
-	appsysfactory: *mut sdk::AppSysFactory,
-	ivmodelinfo: *mut sdk::IVModelInfo,
-	icvar: *mut sdk::ICvar
+	ivengineclient: sdk::IVEngineClient,
+	icliententitylist: sdk::IClientEntityList,
+	ibaseclientdll: sdk::IBaseClientDLL,
+	ienginetrace: sdk::IEngineTrace,
+	appsysfactory: Option<sdk::AppSysFactory>,
+	ivmodelinfo: sdk::IVModelInfo,
+	icvar: Option<sdk::ICvar>
 }
 
 impl GamePointers {
 	pub fn load() -> GamePointers {
 		GamePointers {
-			ivengineclient: unsafe {
-				let engine_ptr = sdk::getptr_ivengineclient();
-				match engine_ptr.is_not_null() {
-					true => { log!("Engine found at {}.\n", engine_ptr); engine_ptr },
-					false => { quit!("Engine not found, dying\n") }
-				}
-			},
-			ibaseclientdll: unsafe { 
-				let ibaseclientdll_ptr = sdk::getptr_ibaseclientdll();
-				match ibaseclientdll_ptr.is_not_null() {
-					true => { log!("IBaseClientDLL found at {}\n", ibaseclientdll_ptr); ibaseclientdll_ptr },
-					false => { quit!("IBaseClientDLL not found, dying\n") }
-				}
-			},
-			icliententitylist: unsafe {
-				let icliententitylist_ptr = sdk::getptr_icliententitylist();
-				match icliententitylist_ptr.is_not_null() {
-					true => { log!("IClientEntityList found at {}\n", icliententitylist_ptr); icliententitylist_ptr },
-					false => { quit!("IClientEntityList not found, dying\n") }
-				}
-			},
-			ienginetrace: unsafe {
-				let ienginetrace_ptr = sdk::getptr_ienginetrace();
-				match ienginetrace_ptr.is_not_null() {
-					true => { log!("IEngineTrace found at {}\n", ienginetrace_ptr); ienginetrace_ptr },
-					false => { quit!("IEngineTrace not found, dying\n") }
-				}
-			},
-			ivmodelinfo: unsafe {
-				let ivmodelinfo_ptr = sdk::getptr_ivmodelinfo();
-				match ivmodelinfo_ptr.is_not_null() {
-					true => { log!("IVModelInfo found at {}\n", ivmodelinfo_ptr); ivmodelinfo_ptr },
-					false => { quit!("IVModelInfo not found, dying\n") }
-				}
-			},
-			appsysfactory: core::ptr::mut_null(),
-			icvar: core::ptr::mut_null()
+			ivengineclient: sdk::get_ivengineclient(),
+			ibaseclientdll: sdk::get_ibaseclientdll(),
+			icliententitylist: sdk::get_icliententitylist(),
+			ienginetrace: sdk::get_ienginetrace(),
+			ivmodelinfo: sdk::get_ivmodelinfo(),
+			appsysfactory: None,
+			icvar: None,
 		}
 	}
 }
@@ -171,7 +141,7 @@ pub unsafe fn locate_cinput() -> Option<*mut sdk::CInput> {
 	}
 }
 #[no_mangle]
-pub unsafe extern "C" fn rainstorm_preinithook(app_sys_factory: *mut sdk::AppSysFactory, _physics_factory: *mut sdk::PhysicsFactory, _globals: *mut sdk::Globals) {
+pub unsafe extern "C" fn rainstorm_preinithook(app_sys_factory: sdk::AppSysFactoryPtr, _physics_factory: *mut (), _globals: *mut ()) {
 	log!("pre-init hook running\n");
 
 	if cheats::CHEAT_MANAGER.is_not_null() {
@@ -195,7 +165,6 @@ pub unsafe extern "C" fn rainstorm_postinithook() {
 #[no_mangle]
 pub unsafe extern "C" fn rainstorm_process_usercmd(cmd: &mut sdk::CUserCmd) {
 	if cheats::CHEAT_MANAGER.is_not_null() {
-		maybe_hook_inetchannel((*cheats::CHEAT_MANAGER).get_gamepointers());
 		(*cheats::CHEAT_MANAGER).process_usercmd(cmd);
 	} else {
 		log!("Cheat manager not found!\n");
@@ -226,7 +195,7 @@ pub extern "C" fn rainstorm_init(log_fd: libc::c_int, hooked_init_trampoline: *c
 	cheats::cheatmgr_setup();
 	
 	unsafe {
-		let mut ibaseclientdll_hooker = vmthook::VMTHooker::new((*cheats::CHEAT_MANAGER).get_gamepointers().ibaseclientdll as *mut *const ());
+		let mut ibaseclientdll_hooker = vmthook::VMTHooker::new((*cheats::CHEAT_MANAGER).get_gamepointers().ibaseclientdll.get_ptr().to_uint() as *mut *const ());
 		REAL_INIT = ibaseclientdll_hooker.get_orig_method(0);
 		REAL_CREATEMOVE = ibaseclientdll_hooker.get_orig_method(21);
 		
@@ -239,36 +208,9 @@ pub extern "C" fn rainstorm_init(log_fd: libc::c_int, hooked_init_trampoline: *c
 		CINPUT_PTR = locate_cinput().unwrap();
 		let mut hooker = vmthook::VMTHooker::new(CINPUT_PTR as *mut *const ());
 		hooker.hook(8, sdk::get_hooked_getusercmd())
-	
 	};
 }
 
-/// If we haven't seen this INetChannel before, hook it.
-fn maybe_hook_inetchannel(ptrs: &GamePointers) {
-	return;
-	
-	static mut LAST_NETCHANNEL: Option<*mut sdk::INetChannel> = None;
-	
-	unsafe {
-		let mut inetchannel = sdk::get_current_inetchannel(ptrs.ivengineclient);
-	
-		let is_new_channel = match LAST_NETCHANNEL {
-			Some(last) => { inetchannel != last },
-			None => true
-		};
-		LAST_NETCHANNEL = Some(inetchannel);
-		
-		if !is_new_channel {
-			log!("Not patching old netchannel");
-			return;
-		}
-		
-		let mut hooker = vmthook::VMTHooker::new(inetchannel as *mut *const ());
-		REAL_NETCHANNEL_SENDNETMSG = hooker.get_orig_method(40);
-		hooker.hook(40, ::sdk::get_netchannel_sendnetmsg_trampoline() as *const ());
-		
-	};
-}
 #[lang = "stack_exhausted"] extern fn stack_exhausted() {}
 #[lang = "eh_personality"] extern fn eh_personality() {}
 
