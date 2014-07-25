@@ -1,5 +1,7 @@
 use core::prelude::*;
-use super::{get_tracefilter, IVEngineClient, IClientEntityList, IEngineTrace, trace_t, Ray_t, QAngle, C_BaseEntity, raw};
+use super::{get_tracefilter, IVEngineClient, IClientEntityList, IEngineTrace, trace_t, Ray_t, QAngle, C_BaseEntity, C_BaseAnimating, raw};
+use sdk;
+use libc;
 
 pub fn trace_to_entity(ivengineclient: IVEngineClient, icliententitylist: IClientEntityList,
 		ienginetrace: IEngineTrace, viewangles: &QAngle) -> Option<C_BaseEntity> {
@@ -55,7 +57,7 @@ impl EntityIterator {
 	}
 }
 
-impl  Iterator<C_BaseEntity> for EntityIterator {
+impl Iterator<C_BaseEntity> for EntityIterator {
 	fn next(&mut self) -> Option<C_BaseEntity> {
 		while (self.current_index <= self.stop_at) { 
 			let maybe_ent = self.entlist.get_client_entity(self.current_index);
@@ -69,5 +71,28 @@ impl  Iterator<C_BaseEntity> for EntityIterator {
 		// if we fell through here, we have reached the end
 		// rest in peperonis
 		None
+	}
+}
+
+pub struct BonePositionIterator {
+	ent: C_BaseAnimating,
+	modelinfo: sdk::IVModelInfo,
+	current_bone: libc::c_int,
+	num_bones: libc::c_int
+}
+impl BonePositionIterator {
+	pub fn new(ent: C_BaseAnimating, modelinfo: sdk::IVModelInfo) -> BonePositionIterator {
+		BonePositionIterator { ent: ent, modelinfo: modelinfo, current_bone: 0, num_bones: ent.get_num_bones(modelinfo) }
+	}
+}
+impl Iterator<sdk::Vector> for BonePositionIterator {
+	fn next(&mut self) -> Option<sdk::Vector> {
+		if self.current_bone >= self.num_bones {
+			None
+		} else {
+			let pos = self.ent.get_bone_position(self.modelinfo, self.current_bone);
+			self.current_bone += 1;
+			Some(pos)
+		}
 	}
 }

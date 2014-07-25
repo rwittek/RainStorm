@@ -294,9 +294,24 @@ impl C_BaseAnimating {
 	pub fn get_ptr(&self) -> raw::C_BaseAnimatingPtr {
 		self.ptr
 	}
-	pub fn get_hitbox_position(&self, modelinfo: IVModelInfo, hitbox: libc::c_int,
-			origin: &mut Vector, angles: &QAngle) {
-		unsafe { raw::c_baseanimating_gethitboxposition(self.get_ptr(), modelinfo.get_ptr(), hitbox, origin, angles) };
+	pub fn get_hitbox_position(&self, modelinfo: IVModelInfo, hitbox: libc::c_int) -> Vector {
+		unsafe { 
+			let mut origin = core::mem::uninitialized();
+			raw::c_baseanimating_gethitboxposition(self.get_ptr(), modelinfo.get_ptr(), hitbox, &mut origin);
+			origin
+		}
+	}
+	pub fn get_bone_position(&self, modelinfo: IVModelInfo, bone: libc::c_int) -> Vector {
+		unsafe { 
+			let mut origin = core::mem::uninitialized();
+			raw::c_baseanimating_getboneposition(self.get_ptr(), modelinfo.get_ptr(), bone, &mut origin);
+			origin
+		}
+	}
+	pub fn get_num_bones(&self, modelinfo: IVModelInfo) -> libc::c_int {
+		unsafe {
+			raw::c_baseanimating_getnumbones(self.get_ptr(), modelinfo.get_ptr())
+		}
 	}
 }
 impl IBaseClientDLL {

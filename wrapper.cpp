@@ -722,7 +722,7 @@ extern "C" bool c_baseentity_isalive(C_BaseEntity *ent) {
 extern "C" int c_baseentity_getindex(C_BaseEntity *ent) {
 	return ent->index;
 }
-void get_bone_position(C_BaseAnimating *ent, IVModelInfo *modelinfo, int iBone, Vector &origin, QAngle &angles )
+void get_bone_position(C_BaseAnimating *ent, IVModelInfo *modelinfo, int iBone, Vector &origin)
 {
 	studiohdr_t *pStudioHdr = modelinfo->GetStudiomodel( ent->GetModel( ) );
 
@@ -743,7 +743,7 @@ void get_bone_position(C_BaseAnimating *ent, IVModelInfo *modelinfo, int iBone, 
 
 	origin = Vector(x, y, z);
 }
-void get_hitbox_position(C_BaseAnimating *ent, IVModelInfo *modelinfo, int hitboxIndex, Vector &origin, QAngle &angles )
+void get_hitbox_position(C_BaseAnimating *ent, IVModelInfo *modelinfo, int hitboxIndex, Vector &origin )
 {
 	int bone = -1;
 	studiohdr_t *pStudioHdr = modelinfo->GetStudiomodel(ent->GetModel());
@@ -757,11 +757,22 @@ void get_hitbox_position(C_BaseAnimating *ent, IVModelInfo *modelinfo, int hitbo
 	}
 	if (bone == -1) return;
 	
-	get_bone_position(ent, modelinfo, bone, origin, angles);
+	get_bone_position(ent, modelinfo, bone, origin);
 }
 
-extern "C" void c_baseanimating_gethitboxposition(C_BaseAnimating *ent, IVModelInfo *modelinfo, int iBone, Vector &origin, QAngle &angles ) {
-	get_hitbox_position(ent, modelinfo, iBone, origin, angles);
+extern "C" void c_baseanimating_gethitboxposition(C_BaseAnimating *ent, IVModelInfo *modelinfo, int iHitbox, Vector &origin ) {
+	get_hitbox_position(ent, modelinfo, iHitbox, origin);
+}
+extern "C" void c_baseanimating_getboneposition(C_BaseAnimating *ent, IVModelInfo *modelinfo, int iBone, Vector &origin) {
+	get_bone_position(ent, modelinfo, iBone, origin);
+}
+extern "C" int c_baseanimating_getnumbones(C_BaseAnimating *ent, IVModelInfo *modelinfo) {
+	studiohdr_t *pStudioHdr = modelinfo->GetStudiomodel( ent->GetModel( ) );
+	if (pStudioHdr) {
+		return pStudioHdr->numbones;
+	} else {
+		return 0;
+	}
 }
 extern "C" void ivengineclient_setviewangles(IVEngineClient *eng, QAngle &ang) {
 	eng->SetViewAngles(ang);
@@ -786,7 +797,7 @@ class TriggerbotTraceFilter : public ITraceFilter
 bool TriggerbotTraceFilter::ShouldHitEntity( IHandleEntity* pHandle, int contentsMask )
 {
     CBaseEntity* pEnt = static_cast<CBaseEntity*>( pHandle );
-
+	CBaseEntity *me = static_cast<C_BaseEntity*>(getptr_icliententitylist()->GetClientEntity(rainstorm_getivengineclient()->GetLocalPlayer( ) ));
     // Huge Credits: Casual_Hacker, I had copied all the code he provided.
     ClientClass* pEntCC = pEnt->GetClientClass();
     const char* ccName = pEntCC->GetName();
@@ -797,7 +808,7 @@ bool TriggerbotTraceFilter::ShouldHitEntity( IHandleEntity* pHandle, int content
         return false;
     }
 
-    if ( pEnt == dynamic_cast<C_BaseEntity*>(getptr_icliententitylist()->GetClientEntity(rainstorm_getivengineclient()->GetLocalPlayer( ) )) )
+    if ( pEnt == me )
     {
         return false;
     }

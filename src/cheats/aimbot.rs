@@ -33,7 +33,7 @@ pub struct Aimbot {
 	last_last_interpdata: Option<(f32, sdk::Vector)>
 }
 
-impl Aimbot {
+impl Aimbot {		
 	fn find_target_spot(&mut self, ptrs: &GamePointers, viewangles: &sdk::QAngle) -> Option<sdk::Vector> {
 		let localplayer_entidx = ptrs.ivengineclient.get_local_player();
 		let me = ptrs.icliententitylist.get_client_entity(localplayer_entidx).unwrap();
@@ -55,57 +55,70 @@ impl Aimbot {
 		let mut icliententitylist = ptrs.icliententitylist;
 		let mut ienginetrace = ptrs.ienginetrace;
 		
-		for (ent, targtype) in sdk::utils::EntityIterator::new(ptrs.icliententitylist)
-				.map(|ent| (ent, get_target_type(ptrs, ent)))
-				.filter_map(|(ent, maybe_targtype)| {
-					match maybe_targtype {
-						Some(targtype) => Some((ent, targtype)),
-						None => None
-					}
-				})
-				.filter(|&(ptr, targtype)|  ptr.get_team() != me.get_team() ) // only enemies
-				.filter(|&(ptr, targtype)|  ptr.get_life_state() == 0 ) { // only alive entities
-			
-			let pos: sdk::Vector = match targtype {
-				Player => { match self.hitbox {
-					Some(hitbox) => {
-						let mut pos = sdk::Vector { x: 0.0, y: 0.0, z: 0.0 };
-						unsafe {
-							// FIXME: Ew.
-							let baseanimating = sdk::C_BaseAnimating::from_ptr(sdk::raw::C_BaseAnimatingPtr::from_uint(ent.get_ptr().to_uint()));
-							baseanimating.get_hitbox_position(ptrs.ivmodelinfo, hitbox,
-								&mut pos, viewangles)
-						};
-						pos
-					},
-					None => { ent.worldspacecenter() }
-				}},
-				Sentry | Teleporter | Dispenser | MVMTank => {
-					unsafe {
-						ent.worldspacecenter()
-					}
-				},
+		{
+			let prioritize = |pos: sdk::Vector, ent: sdk::C_BaseEntity, targtype: AimbotTargetType| {
+				let aimvec = pos - eyes;
+				let mut tempangles = aimvec.to_angle();
 				
-			};
-			let aimvec = pos - eyes;
-			let mut tempangles = aimvec.to_angle();
-			// can we actually see this?
-			match sdk::utils::trace_to_entity(ivengineclient, icliententitylist, ienginetrace, &tempangles) {
-				Some(trace_ent) if trace_ent == ent => (), // OK
-				Some(trace_ent) => {
-					continue;
-				},
-				None => {
-					continue
+				// can we actually see this?
+				match sdk::utils::trace_to_entity(ivengineclient, icliententitylist, ienginetrace, &tempangles) {
+					Some(trace_ent) if trace_ent == ent => (), // OK
+					Some(trace_ent) => {
+						return
+					},
+					None => {
+						return
+					}
 				}
-			}
 
-			let dist = (aimvec).length();
-			let priority = -dist;
-			if priority > max_priority {
-				//log!("target: {}, {}, {}", unsafe {(*ptr).get_index()}, pos, dist);
-				max_priority = priority;
-				best_targ = Some(pos);
+				let dist = (aimvec).length();
+				let priority = -dist;
+				if priority > max_priority {
+					//log!("target: {}, {}, {}", unsafe {(*ptr).get_index()}, pos, dist);
+					max_priority = priority;
+					best_targ = Some(pos);
+				}
+			};
+			
+			for (ent, targtype) in sdk::utils::EntityIterator::new(ptrs.icliententitylist)
+					.map(|ent| (ent, get_target_type(ptrs, ent)))
+					.filter_map(|(ent, maybe_targtype)| {
+						match maybe_targtype {
+							Some(targtype) => Some((ent, targtype)),
+							None => None
+						}
+					})
+					.filter(|&(ptr, targtype)|  ptr.get_team() != me.get_team() ) // only enemies
+					.filter(|&(ptr, targtype)|  ptr.get_life_state() == 0 ) { // only alive entities
+					
+				match targtype {
+					Player => { 	
+						// FIXME: Ew.
+						let baseanimating = unsafe {
+							sdk::C_BaseAnimating::from_ptr(sdk::raw::C_BaseAnimatingPtr::from_uint(ent.get_ptr().to_uint()))
+						};
+							
+						match self.hitbox {
+							Some(hitbox) => {
+								
+								let hitbox_pos = baseanimating.get_hitbox_position(ptrs.ivmodelinfo, hitbox);
+			
+								prioritize(hitbox_pos, ent, targtype)
+							},
+							None => {
+								for bone_pos in sdk::utils::BonePositionIterator::new(baseanimating, ptrs.ivmodelinfo) {
+									prioritize(bone_pos, ent, targtype)
+								}
+							}
+						}
+					},
+					Sentry | Teleporter | Dispenser | MVMTank => {
+						unsafe {
+							prioritize(ent.worldspacecenter(), ent, targtype)
+						}
+					},
+					
+				}
 			}
 		}
 		

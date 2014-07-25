@@ -83,8 +83,11 @@ extern "C" {
 	pub fn getptr_ivmodelinfo() -> IVModelInfoPtr;
 	
 	pub fn c_baseanimating_gethitboxposition(ent: C_BaseAnimatingPtr, modelinfo: IVModelInfoPtr, hitbox: libc::c_int,
-		origin: &mut Vector, angles: &QAngle);
-		
+		origin: &mut Vector);
+	pub fn c_baseanimating_getboneposition(ent: C_BaseAnimatingPtr, modelinfo: IVModelInfoPtr, bone: libc::c_int,
+		origin: &mut Vector);
+	pub fn c_baseanimating_getnumbones(ent: C_BaseAnimatingPtr, modelinfo: IVModelInfoPtr) -> libc::c_int;
+	
 	pub fn getptr_cinput(client: IBaseClientDLLPtr) -> CInputPtr;
 	pub fn icvar_findvar(icvar: ICvarPtr, name: * const char) -> ConVarPtr; // MAYBE NULL;
 	pub fn convar_setvalue_raw_int(cvar: ConVarPtr, value: libc::c_int);

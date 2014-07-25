@@ -42,7 +42,7 @@ impl Cheat for NameChanger {
 		// FIXME: ugly string crappery
 		for ent in sdk::utils::EntityIterator::new(ptrs.icliententitylist)
 				.filter(|ptr| ptr.get_classname() == "CTFPlayer")
-				.filter(|ent| unsafe { ent.ptr_offset::<u32>(0x00AC) == me.ptr_offset::<u32>(0x00AC) } ) {
+				.filter(|ent| unsafe { *ent.ptr_offset::<u32>(0x00AC) == *me.ptr_offset::<u32>(0x00AC) } ) {
 			let mut buf = [0u8, ..300];
 			let len = ptrs.ivengineclient.get_player_name(ent, buf.as_mut_slice());
 			if len == 0 { return; }
