@@ -21,11 +21,11 @@ pub fn trace_to_entity(ivengineclient: IVEngineClient, icliententitylist: IClien
 		eyes.y += (eye_offsets)[1];
 		eyes.z += (eye_offsets)[2];
 	}
-	direction = direction.scale( 8192.0f32 ) + eyes;
+	let trace_direction = direction.scale( 8192.0f32 ) + eyes;
 	
-	let ray = Ray_t::new(&eyes, &direction);
+	let ray = Ray_t::new(&eyes, &trace_direction);
 
-	ienginetrace.trace_ray(&ray, 0x46004001, Some(unsafe { get_tracefilter(me) }), &mut trace);
+	ienginetrace.trace_ray(&ray, 0x4600400B, Some(unsafe { get_tracefilter(me) }), &mut trace);
 	
 	if trace.base.allsolid  {
 		None

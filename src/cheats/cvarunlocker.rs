@@ -14,11 +14,11 @@ impl Cheat for CvarUnlocker {
 		"Cvar Unlocker"
 	}
 	fn postinit(&mut self, ptrs: &GamePointers) {
-		let icvar = unsafe { (ptrs.icvar.to_option().unwrap()) };
-		let sv_cheats = icvar.find_var("sv_cheats");
+		let icvar = ptrs.icvar.unwrap();
+		let mut sv_cheats = icvar.find_var("sv_cheats");
 		match sv_cheats {
-			Some(cheats) => unsafe { (*cheats).setvalue_raw(sdk::Int(1)); log!("sv_cheats set to 1 OK\n") },
-			None => {log!("No sv_cheats?!"); unsafe { libc::exit(1); }}
+			Some(mut cheats) => unsafe { cheats.setvalue_raw(sdk::Int(1)); log!("sv_cheats set to 1 OK\n") },
+			None => {quit!("No sv_cheats?\n")}
 		}
 	}
 }

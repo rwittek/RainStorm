@@ -7,6 +7,7 @@ use core;
 // the lifetime of these is "hopefully long enough"
 macro_rules! ptr_wrapper(
 	($name:ident) => (
+		#[allow(raw_pointer_deriving)]
 		#[deriving(Show)]
 		pub struct $name (*mut ());
 		impl core::cmp::PartialEq for $name {
@@ -17,18 +18,21 @@ macro_rules! ptr_wrapper(
 			}
 		}
 		impl $name {
-			fn null() -> $name {
+			pub fn null() -> $name {
 				$name(core::ptr::RawPtr::null())
 			}
-			fn is_null(&self) -> bool {
+			pub fn is_null(&self) -> bool {
 				self == &$name::null()
 			}
-			fn is_not_null(&self) -> bool {
+			pub fn is_not_null(&self) -> bool {
 				self != &$name::null()
 			}
-			fn to_uint(&self) -> uint {
+			pub fn to_uint(&self) -> uint {
 				let &$name(ref ptr) = self;
 				(*ptr) as uint
+			}
+			pub unsafe fn from_uint(val: uint) -> $name {
+				$name(val as *mut ())
 			}
 		}
 	)

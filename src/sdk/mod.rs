@@ -219,6 +219,9 @@ impl ITraceFilter {
 	pub unsafe fn from_ptr(ptr: raw::ITraceFilterPtr) -> ITraceFilter {
 		ITraceFilter { ptr: ptr }
 	}
+		pub fn get_ptr(&self) -> raw::ITraceFilterPtr {
+		self.ptr
+	}
 }
 impl Ray_t {
 	pub fn new(start: &Vector, end: &Vector) -> Ray_t {
@@ -269,6 +272,12 @@ impl C_BaseEntity {
 		(((self.get_ptr().to_uint()) + offset) as *const DataType)
 	}
 }
+impl core::cmp::PartialEq for C_BaseEntity {
+	fn eq(&self, other: &C_BaseEntity) -> bool {
+		self.ptr == other.ptr
+	}
+}
+
 impl IVModelInfo {
 	pub unsafe fn get_ptr(&self) -> raw::IVModelInfoPtr {
 		self.ptr
@@ -282,12 +291,12 @@ impl C_BaseAnimating {
 	pub unsafe fn from_ptr(ptr: raw::C_BaseAnimatingPtr) -> C_BaseAnimating {
 		C_BaseAnimating { ptr: ptr }
 	}
-	pub unsafe fn get_ptr(&self) -> raw::C_BaseAnimatingPtr {
+	pub fn get_ptr(&self) -> raw::C_BaseAnimatingPtr {
 		self.ptr
 	}
 	pub fn get_hitbox_position(&self, modelinfo: IVModelInfo, hitbox: libc::c_int,
 			origin: &mut Vector, angles: &QAngle) {
-		raw::c_baseanimating_gethitboxposition(self.get_ptr(), modelinfo.get_ptr(), hitbox, origin, angles);
+		unsafe { raw::c_baseanimating_gethitboxposition(self.get_ptr(), modelinfo.get_ptr(), hitbox, origin, angles) };
 	}
 }
 impl IBaseClientDLL {
@@ -315,16 +324,20 @@ impl Vector {
 		unsafe { raw::vector_length(self) }
 	}
 	pub fn to_angle(&self) -> QAngle {
-		let temp = core::mem::uninitialized();
-		raw::vector_angles(self, &mut temp);
-		temp
+		unsafe {
+			let mut temp = core::mem::uninitialized();
+			raw::vector_angles(self, &mut temp);
+			temp
+		}
 	}
 }
 impl QAngle {
 	pub fn to_vector(&self) -> Vector {
-		let temp = core::mem::uninitialized();
-		raw::angle_vectors(self, &mut temp, core::ptr::mut_null(), core::ptr::mut_null());
-		temp
+		unsafe {
+			let mut temp = core::mem::uninitialized();
+			raw::angle_vectors(self, &mut temp, core::ptr::mut_null(), core::ptr::mut_null());
+			temp
+		}
 	}
 }
 impl core::ops::Add<Vector, Vector> for Vector {
@@ -342,7 +355,9 @@ impl IVEngineClient {
 	pub unsafe fn from_ptr(ptr: raw::IVEngineClientPtr) -> IVEngineClient {
 		IVEngineClient { ptr: ptr }
 	}
-	
+	pub fn get_ptr(&self) -> raw::IVEngineClientPtr {
+		self.ptr
+	}
 	pub fn client_cmd(&mut self, command: &'static str) -> Result<(), &'static str> {
 		let mut buf = [0u8, ..256];
 		if command.len() >= buf.len() {
@@ -350,24 +365,24 @@ impl IVEngineClient {
 		}
 		unsafe { core::ptr::copy_nonoverlapping_memory(transmute::<*const u8, *mut u8>(buf.repr().data), transmute(command.repr().data), command.len()); };
 		buf[command.len()] = 0;
-		unsafe { raw::ivengineclient_clientcmd(self, core::mem::transmute(buf.repr().data )) };
+		unsafe { raw::ivengineclient_clientcmd(self.get_ptr(), core::mem::transmute(buf.repr().data )) };
 		
 		Ok(())
 	}
 	pub fn time(&mut self) -> f32 {
-		unsafe { raw::ivengineclient_time(self) } 
+		unsafe { raw::ivengineclient_time(self.get_ptr()) } 
 	}
 	pub fn get_local_player(&self) -> libc::c_int {
-		unsafe { raw::ivengineclient_getlocalplayer(self) }
+		unsafe { raw::ivengineclient_getlocalplayer(self.get_ptr()) }
 	}
-	pub fn get_player_name(&self, ent: &C_BaseEntity, buf: &mut [u8]) -> u32 {
+	pub fn get_player_name(&self, ent: C_BaseEntity, buf: &mut [u8]) -> u32 {
 		unsafe {
-			raw::ivengineclient_getplayername(self, ent, buf.repr().data as *mut u8, buf.repr().len as u32)
+			raw::ivengineclient_getplayername(self.get_ptr(), ent.get_ptr(), buf.repr().data as *mut u8, buf.repr().len as u32)
 		}
 	}
 	pub fn set_viewangles(&mut self, angles: &QAngle) {
 		unsafe {
-			raw::ivengineclient_setviewangles(self, angles)
+			raw::ivengineclient_setviewangles(self.get_ptr(), angles)
 		}
 	}
 }
@@ -375,9 +390,12 @@ impl IClientEntityList {
 	pub unsafe fn from_ptr(ptr: raw::IClientEntityListPtr) -> IClientEntityList {
 		IClientEntityList { ptr: ptr }
 	}
+	pub fn get_ptr(&self) -> raw::IClientEntityListPtr {
+		self.ptr
+	}
 	pub fn get_client_entity(&self, entidx: libc::c_int) -> Option<C_BaseEntity> {
 		unsafe {
-			let ptr = raw::icliententitylist_getcliententity(self, entidx);
+			let ptr = raw::icliententitylist_getcliententity(self.get_ptr(), entidx);
 			if ptr.is_not_null() {
 				Some(C_BaseEntity::from_ptr(ptr))
 			} else {
@@ -386,7 +404,7 @@ impl IClientEntityList {
 		}
 	}
 	pub fn get_highest_entity_index(&self) -> libc::c_int {
-		unsafe { raw::icliententitylist_get_highest_entity_index(self) }
+		unsafe { raw::icliententitylist_get_highest_entity_index(self.get_ptr()) }
 	}
 }
 impl ICvar {
@@ -400,13 +418,16 @@ impl IEngineTrace {
 	pub unsafe fn from_ptr(ptr: raw::IEngineTracePtr) -> IEngineTrace {
 		IEngineTrace { ptr: ptr }
 	}
+	pub unsafe fn get_ptr(&self) -> raw::IEngineTracePtr {
+		self.ptr
+	}
 	
 	pub fn trace_ray(&self, ray: &Ray_t, mask: u32, filter: Option<ITraceFilter>, trace: &mut trace_t) {
 		let filter_ptr = match filter {
 			Some(filter) => filter.get_ptr(),
-			None => core::ptr::mut_null()
+			None => raw::ITraceFilterPtr::null()
 		};
-		unsafe { raw::ienginetrace_traceray(self, ray, mask, filter_ptr, trace) };
+		unsafe { raw::ienginetrace_traceray(self.get_ptr(), ray, mask, filter_ptr, trace) };
 	}
 }
 pub enum ConVarValue {
@@ -415,28 +436,34 @@ pub enum ConVarValue {
 }
 
 impl ConVar {
+	pub unsafe fn from_ptr(ptr: raw::ConVarPtr) -> ConVar {
+		ConVar { ptr: ptr }
+	}
+	pub fn get_ptr(&self) -> raw::ConVarPtr {
+		self.ptr
+	}
 	pub unsafe fn setvalue_raw(&mut self, val: ConVarValue) {
 		match val {
-			Int(v) => raw::convar_setvalue_raw_int(self as *mut ConVar, v),
-			Str(s) => raw::convar_setvalue_str(self as *mut ConVar, s)
+			Int(v) => raw::convar_setvalue_raw_int(self.get_ptr(), v),
+			Str(s) => raw::convar_setvalue_str(self.get_ptr(), s)
 		}
 	}
 	pub unsafe fn setvalue(&mut self, val: ConVarValue) {
 		match val {
-			Int(v) => raw::convar_setvalue_raw_int(self as *mut ConVar, v),
-			Str(s) => raw::convar_setvalue_str(self as *mut ConVar, s)
+			Int(v) => raw::convar_setvalue_raw_int(self.get_ptr(), v),
+			Str(s) => raw::convar_setvalue_str(self.get_ptr(), s)
 		}
 	}
 	pub unsafe fn changeandfreeze(&mut self, newval: CString) {
-		raw::convar_changeandfreeze(self as *mut ConVar, newval)
+		raw::convar_changeandfreeze(self.get_ptr(), newval)
 	}
 	pub unsafe fn clearflags(&mut self) {
-		raw::convar_clearflags(self as *mut ConVar)
+		raw::convar_clearflags(self.get_ptr())
 	}
 }
 
 impl ICvar {
-	pub fn find_var(&self, name: &str) -> Option<*mut ConVar> {
+	pub fn find_var(&self, name: &str) -> Option<ConVar> {
 		let mut buf = [0u8, ..256];
 		if name.len() >= buf.len() {
 			return None
@@ -446,9 +473,12 @@ impl ICvar {
 			let raw_convar = unsafe { raw::icvar_findvar(self.get_ptr(), transmute(buf.repr().data)) };
 			match raw_convar.is_null() {
 				true => None,
-				false => Some(raw_convar)
+				false => unsafe { Some(ConVar::from_ptr(raw_convar)) }
 			}
 		}
+	}
+	pub fn get_ptr(&self) -> raw::ICvarPtr {
+		self.ptr
 	}
 }
 

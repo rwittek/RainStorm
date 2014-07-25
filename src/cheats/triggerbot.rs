@@ -24,9 +24,9 @@ impl Cheat for Triggerbot {
 			return;
 		}
 		
-		let mut ivengineclient = unsafe { ptrs.ivengineclient.to_option().unwrap() };
-		let mut icliententitylist = unsafe { ptrs.icliententitylist.to_option().unwrap() };
-		let mut ienginetrace = unsafe { ptrs.ienginetrace.to_option().unwrap() };
+		let mut ivengineclient = ptrs.ivengineclient;
+		let mut icliententitylist = ptrs.icliententitylist;
+		let mut ienginetrace = ptrs.ienginetrace;
 		// button 1 = IN_ATTACK
 		if cmd.buttons & 1 == 1 {
 			cmd.buttons = !((!cmd.buttons) | 1); // zero the IN_ATTACK bit

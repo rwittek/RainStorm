@@ -11,7 +11,7 @@ pub enum AimbotTargetType {
 	/* poot */ Dispenser, /* here */
 	MVMTank
 }
-fn get_target_type(ptrs: &GamePointers, ent: &sdk::C_BaseEntity) -> Option<AimbotTargetType> {
+fn get_target_type(ptrs: &GamePointers, ent: sdk::C_BaseEntity) -> Option<AimbotTargetType> {
 	let classname = ent.get_classname();
 	
 	match classname {
@@ -35,14 +35,8 @@ pub struct Aimbot {
 
 impl Aimbot {
 	fn find_target_spot(&mut self, ptrs: &GamePointers, viewangles: &sdk::QAngle) -> Option<sdk::Vector> {
-		let localplayer_entidx = unsafe {ptrs.ivengineclient.to_option().unwrap().get_local_player()};
-		let local_baseentity = unsafe {ptrs.icliententitylist.to_option().unwrap().get_client_entity(localplayer_entidx)};
-		
-		let me: &mut sdk::C_BaseEntity = if local_baseentity.is_not_null() {
-			unsafe { core::mem::transmute(local_baseentity) }
-		} else {
-			quit!("IClientEntity of local player (id: {}) not found!\n", localplayer_entidx); 
-		};
+		let localplayer_entidx = ptrs.ivengineclient.get_local_player();
+		let me = ptrs.icliententitylist.get_client_entity(localplayer_entidx).unwrap();
 
 		let mut direction = sdk::Vector::new();
 
@@ -57,41 +51,38 @@ impl Aimbot {
 		let mut max_priority = core::f32::MIN_VALUE; // this is signed
 		let mut best_targ: Option<sdk::Vector> = None;
 		
-		let mut ivengineclient = unsafe { ptrs.ivengineclient.to_option().unwrap() };
-		let mut icliententitylist = unsafe { ptrs.icliententitylist.to_option().unwrap() };
-		let mut ienginetrace = unsafe { ptrs.ienginetrace.to_option().unwrap() };
+		let mut ivengineclient = ptrs.ivengineclient;
+		let mut icliententitylist = ptrs.icliententitylist;
+		let mut ienginetrace = ptrs.ienginetrace;
 		
-		for (ptr, targtype) in sdk::utils::EntityIterator::new(ptrs.icliententitylist)
-				.map(|ptr| (ptr, get_target_type(ptrs, unsafe {&*ptr})))
-				.filter_map(|(ptr, maybe_targtype)| {
+		for (ent, targtype) in sdk::utils::EntityIterator::new(ptrs.icliententitylist)
+				.map(|ent| (ent, get_target_type(ptrs, ent)))
+				.filter_map(|(ent, maybe_targtype)| {
 					match maybe_targtype {
-						Some(targtype) => Some((ptr, targtype)),
+						Some(targtype) => Some((ent, targtype)),
 						None => None
 					}
 				})
-				.filter(|&(ptr, targtype)| unsafe { (*ptr).get_team() != me.get_team() }) // only enemies
-				.filter(|&(ptr, targtype)| unsafe { (*ptr).get_life_state() == 0 }) { // only alive entities
+				.filter(|&(ptr, targtype)|  ptr.get_team() != me.get_team() ) // only enemies
+				.filter(|&(ptr, targtype)|  ptr.get_life_state() == 0 ) { // only alive entities
 			
-
-			//log!("Checking a {}\n", targtype);
 			let pos: sdk::Vector = match targtype {
 				Player => { match self.hitbox {
 					Some(hitbox) => {
 						let mut pos = sdk::Vector { x: 0.0, y: 0.0, z: 0.0 };
 						unsafe {
-							let baseanimating = sdk::C_BaseAnimating::from_ptr(core::mem::transmute(ptr));
+							// FIXME: Ew.
+							let baseanimating = sdk::C_BaseAnimating::from_ptr(sdk::raw::C_BaseAnimatingPtr::from_uint(ent.get_ptr().to_uint()));
 							baseanimating.get_hitbox_position(ptrs.ivmodelinfo, hitbox,
 								&mut pos, viewangles)
 						};
 						pos
 					},
-					None => { unsafe {
-							(*ptr).worldspacecenter()
-					} }
+					None => { ent.worldspacecenter() }
 				}},
 				Sentry | Teleporter | Dispenser | MVMTank => {
 					unsafe {
-						(*ptr).worldspacecenter()
+						ent.worldspacecenter()
 					}
 				},
 				
@@ -100,7 +91,7 @@ impl Aimbot {
 			let mut tempangles = aimvec.to_angle();
 			// can we actually see this?
 			match sdk::utils::trace_to_entity(ivengineclient, icliententitylist, ienginetrace, &tempangles) {
-				Some(trace_ent) if trace_ent == ptr => (), // OK
+				Some(trace_ent) if trace_ent == ent => (), // OK
 				Some(trace_ent) => {
 					continue;
 				},
@@ -111,7 +102,7 @@ impl Aimbot {
 
 			let dist = (aimvec).length();
 			let priority = -dist;
-			if priority < max_priority {
+			if priority > max_priority {
 				//log!("target: {}, {}, {}", unsafe {(*ptr).get_index()}, pos, dist);
 				max_priority = priority;
 				best_targ = Some(pos);
@@ -157,14 +148,10 @@ impl Aimbot {
 			
 			
 	fn aim_at_target(&self, ptrs: &GamePointers, cmd: &mut sdk::CUserCmd, target: sdk::Vector) {
-		let localplayer_entidx = unsafe {ptrs.ivengineclient.to_option().unwrap().get_local_player()};
-		let local_baseentity = unsafe {ptrs.icliententitylist.to_option().unwrap().get_client_entity(localplayer_entidx)};
+		let localplayer_entidx = unsafe {ptrs.ivengineclient.get_local_player()};
+		let me = unsafe {ptrs.icliententitylist.get_client_entity(localplayer_entidx)}.unwrap();
 		
-		let me: &mut sdk::C_BaseEntity = if local_baseentity.is_not_null() {
-			unsafe { core::mem::transmute(local_baseentity) }
-		} else {
-			quit!("IClientEntity of local player (id: {}) not found!\n", localplayer_entidx); 
-		};
+		
 
 		let mut eyes = me.get_origin();
 		
@@ -175,10 +162,8 @@ impl Aimbot {
 			eyes.z += (eye_offsets)[2];
 		}
 		let aimvec = target - eyes;
-		
-		// interpolate
-		
-		aimvec.to_angle()
+
+		cmd.viewangles = aimvec.to_angle();
 		
 	}
 }

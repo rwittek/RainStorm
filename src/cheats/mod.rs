@@ -113,7 +113,7 @@ impl CheatManager {
 	pub unsafe fn preinit(&mut self, appsysfactory: sdk::AppSysFactoryPtr) {
 		self.ptrs.appsysfactory = Some(sdk::AppSysFactory::from_ptr(appsysfactory));
 		
-		self.ptrs.icvar = Some( sdk::get_icvar(appsysfactory) );
+		self.ptrs.icvar = Some( sdk::get_icvar(&self.ptrs.appsysfactory.unwrap()) );
 		
 		for cheat in self.cheats.mut_iter() {
 			cheat.preinit(&self.ptrs);
@@ -132,16 +132,5 @@ impl CheatManager {
 	
 	pub fn get_gamepointers<'a>(&'a self) -> &'a GamePointers {
 		&self.ptrs
-	}
-	
-	
-	// these getters should really use mutexes, but w/e
-	// they don't return an option, because we validate as they are going in
-	pub fn get_ivengineclient<'a>(&'a self) -> &'a mut sdk::IVEngineClient {
-		if self.ptrs.ivengineclient.is_not_null() {
-			unsafe { core::mem::transmute(self.ptrs.ivengineclient) }
-		} else {
-			quit!("IVEngineClient was null (this should never happen!)\n");
-		}
 	}
 }	

@@ -791,8 +791,8 @@ bool TriggerbotTraceFilter::ShouldHitEntity( IHandleEntity* pHandle, int content
     ClientClass* pEntCC = pEnt->GetClientClass();
     const char* ccName = pEntCC->GetName();
 	//fprintf(logfile, "%s\n", ccName);
-    if ( strcmp(ccName, "CFuncRespawnRoomVisualizer") == 0 || strcmp(ccName, "CTFMedigunShield") == 0 ||
-        strcmp(ccName,"CFuncAreaPortalWindow") == 0)
+    if ( strcmp(ccName, "CFuncRespawnRoomVisualizer") == 0 || strcmp(ccName, "CTFMedigunShield") == 0 )// ||
+       // strcmp(ccName,"CFuncAreaPortalWindow") == 0)
     {
         return false;
     }
