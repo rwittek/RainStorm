@@ -34,7 +34,8 @@ impl Cheat for Triggerbot {
 		if cmd.buttons & 1 == 1 {
 			cmd.buttons = !((!cmd.buttons) | 1); // zero the IN_ATTACK bit
 			
-			if ::utils::should_shoot(ivengineclient, icliententitylist, ienginetrace, &cmd.viewangles, None) {
+			// FIXME
+			if false { //::utils::should_shoot(ivengineclient, icliententitylist, ienginetrace, &cmd.viewangles, None) {
 				self.smoothing_state = self.smoothing_state + 1;
 				if self.smoothing_state > self.smoothing {
 					cmd.buttons = cmd.buttons | 1; // set IN_ATTACK

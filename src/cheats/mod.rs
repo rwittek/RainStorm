@@ -61,7 +61,6 @@ impl CheatManager {
 		let forceattack: Box<forceattack::ForceAttack> = box Cheat::new();
 		let triggerbot: Box<triggerbot::Triggerbot> = box Cheat::new();
 		let cvarunlocker: Box<cvarunlocker::CvarUnlocker> = box Cheat::new();
-		let speedhack: Box<speedhack::Speedhack> = box Cheat::new();
 		let namechanger: Box<namechanger::NameChanger> = box Cheat::new();
 		let aimbot: Box<aimbot::Aimbot> = box Cheat::new();
 		let nocmd: Box<nocmd::NoCmd> = box Cheat::new();
@@ -79,7 +78,6 @@ impl CheatManager {
 		mgr.cheats.push(cvarunlocker);
 		mgr.cheats.push(aimbot);
 		mgr.cheats.push(triggerbot);
-		mgr.cheats.push(speedhack);
 		mgr.cheats.push(namechanger);
 		mgr.cheats.push(nocmd);
 		mgr.cheats.push(airstuck);

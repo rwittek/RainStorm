@@ -3,8 +3,8 @@ use libc;
 use sdk;
 use core;
 
-pub fn should_shoot(ivengineclient: &sdk::IVEngineClient, icliententitylist: &sdk::IClientEntityList,
-		ienginetrace: &sdk::IEngineTrace, viewangles: &sdk::QAngle, hitbox: Option<i32>) -> bool {
+pub fn trace_to_entity(ivengineclient: &sdk::IVEngineClient, icliententitylist: &sdk::IClientEntityList,
+		ienginetrace: &sdk::IEngineTrace, viewangles: &sdk::QAngle) -> Option<*mut sdk::C_BaseEntity> {
 	let mut trace = unsafe { sdk::trace_t::new() };
 	
 	let localplayer_entidx = ivengineclient.get_local_player();
@@ -38,25 +38,12 @@ pub fn should_shoot(ivengineclient: &sdk::IVEngineClient, icliententitylist: &sd
 	ienginetrace.trace_ray(&ray, 0x46004001, Some(unsafe { &mut *sdk::get_tracefilter(me as *const sdk::C_BaseEntity) }), &mut trace);
 	
 	if trace.base.allsolid  {
-		return false;
+		None
+	} else if trace.ent.is_not_null() {
+		Some(trace.ent)
+	} else {
+		None
 	}
-	
-	if  trace.ent.is_not_null() {
-		//log!("Hit hitbox {}, looking for {}\n",trace.hitbox, hitbox);
-		let correct_location = match hitbox {
-			Some(hb) => (trace.hitbox == (hb)),
-			None => true
-		};
-		if correct_location && unsafe {
-					*((*trace.ent).ptr_offset::<u32>(0x00AC)) != *(me.ptr_offset(0x00AC))
-				}
-		{
-			return true;
-		}
-		return false; //pTrace.m_pEnt->m_iTeamNum != pBaseEntity->m_iTeamNum; // Avoid teammates.
-	}
-
-	false
 }
 
 pub unsafe fn search_memory(start: *const (), len: uint, pattern: &[u8]) -> Option<*const ()> {

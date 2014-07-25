@@ -11,24 +11,24 @@ use core::mem::transmute;
 use core::ptr::RawPtr;
 
 pub use CString;
-// opaque phantom types
-pub enum IVEngineClient {}
-pub enum IBaseClientDLL {}
-pub enum ConVar {}
-pub enum ICvar {}
-pub enum AppSysFactory {}
-pub enum PhysicsFactory {}
-pub enum Globals {}
-pub enum CInput {}
-pub enum C_BaseEntity {}
-pub enum C_BaseAnimating {}
-pub enum IHandleEntity {}
-pub enum IClientEntityList {}
-pub enum IEngineTrace {}
-pub enum IVModelInfo {}
-pub enum INetChannel {}
-pub enum INetMessage {}
-pub enum ITraceFilter {}
+
+pub struct IVEngineClientPtr (*mut ());
+pub struct IBaseClientDLLPtr (*mut ());
+pub struct ConVarPtr (*mut ());
+pub struct ICvarPtr (*mut ());
+pub struct AppSysFactoryPtr (*mut ());
+pub struct PhysicsFactoryPtr (*mut ());
+pub struct GlobalsPtr (*mut ());
+pub struct CInputPtr (*mut ());
+pub struct C_BaseEntityPtr (*mut ());
+pub struct C_BaseAnimatingPtr (*mut ());
+pub struct IHandleEntityPtr (*mut ());
+pub struct IClientEntityListPtr (*mut ());
+pub struct IEngineTracePtr (*mut ());
+pub struct IVModelInfoPtr (*mut ());
+pub struct INetChannelPtr (*mut ());
+pub struct INetMessagePtr (*mut ());
+pub struct ITraceFilterPtr (*mut ());
 
 pub static IN_ATTACK: libc::c_int = (1 << 0);
 pub static IN_JUMP: libc::c_int = (1 << 1);
@@ -139,7 +139,7 @@ impl Ray_t {
 	}
 }
 impl C_BaseEntity {
-	pub fn get_origin(&self) -> Vector {
+	pub fn get_origin(self) -> Vector {
 		unsafe { c_baseentity_getorigin(self) }
 	}
 	pub fn worldspacecenter(&self) -> Vector {

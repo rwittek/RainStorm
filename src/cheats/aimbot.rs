@@ -8,7 +8,8 @@ pub enum AimbotTargetType {
 	Player,
 	Sentry,
 	Teleporter,
-	/* poot */ Dispenser /* here */
+	/* poot */ Dispenser, /* here */
+	MVMTank
 }
 fn get_target_type(ptrs: &GamePointers, ent: &sdk::C_BaseEntity) -> Option<AimbotTargetType> {
 	let classname = ent.get_classname();
@@ -18,6 +19,7 @@ fn get_target_type(ptrs: &GamePointers, ent: &sdk::C_BaseEntity) -> Option<Aimbo
 		"CObjectSentrygun" => Some(Sentry),
 		"CObjectTeleporter" => Some(Teleporter),
 		"CObjectDispenser" => Some(Dispenser),
+		"CTFTankBoss" => Some(MVMTank),
 		_ => None
 	}
 }
@@ -52,7 +54,7 @@ impl Aimbot {
 			eyes.y += (eye_offsets)[1];
 			eyes.z += (eye_offsets)[2];
 		}
-		let mut maxdist = 100000.0;
+		let mut max_priority = core::i32::MIN; // this is signed
 		let mut best_targ: Option<sdk::Vector> = None;
 		
 		let mut ivengineclient = unsafe { ptrs.ivengineclient.to_option().unwrap() };
@@ -88,7 +90,7 @@ impl Aimbot {
 							(*ptr).worldspacecenter()
 					} }
 				}},
-				Sentry | Teleporter | Dispenser => {
+				Sentry | Teleporter | Dispenser | MVMTank => {
 					unsafe {
 						(*ptr).worldspacecenter()
 					}
@@ -98,12 +100,18 @@ impl Aimbot {
 			let aimvec = pos - eyes;
 			unsafe { sdk::vector_angles(&aimvec, &mut tempangles) };
 			// can we actually see this?
-			if !::utils::should_shoot(ivengineclient, icliententitylist, ienginetrace, &tempangles, None) {
-				// can't see it
-				continue;
+			match ::utils::trace_to_entity(ivengineclient, icliententitylist, ienginetrace, &tempangles) {
+				Some(trace_ent) if trace_ent == ptr => (), // OK
+				Some(trace_ent) => {
+					continue;
+				},
+				None => {
+					continue
+				}
 			}
-			// TODO: priority
+
 			let dist = (aimvec).length();
+			let health = unsafe { (*ptr).get_health() };
 			if dist < maxdist {
 				//log!("target: {}, {}, {}", unsafe {(*ptr).get_index()}, pos, dist);
 				maxdist = dist;
@@ -180,7 +188,7 @@ impl Aimbot {
 
 impl Cheat for Aimbot {
 	fn new() -> Aimbot {
-		Aimbot { enabled: false, hitbox: None, stop_firing: 0, last_interpdata: None, last_last_interpdata: None }
+		Aimbot { enabled: false, hitbox: None, stop_firing: 1, last_interpdata: None, last_last_interpdata: None }
 	}
 	fn get_name<'a>(&'a self) -> &'a str {
 		"Aimbot"
