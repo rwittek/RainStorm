@@ -1,3 +1,7 @@
+use libc;
+use super::{trace_t, Ray_t, Vector, QAngle};
+use CString;
+ 
 pub struct IVEngineClientPtr (*mut ());
 pub struct IBaseClientDLLPtr (*mut ());
 pub struct ConVarPtr (*mut ());
@@ -18,17 +22,17 @@ pub struct ITraceFilterPtr (*mut ());
 
 extern "C" {
 	pub fn getptr_ivengineclient() -> IVEngineClientPtr; // MAYBE NULL
-	pub fn ivengineclient_clientcmd(engine: IVEngineClientPtr, cmd_string: * const c_char);
+	pub fn ivengineclient_clientcmd(engine: IVEngineClientPtr, cmd_string: * const libc::c_char);
 	pub fn ivengineclient_time(engine: IVEngineClientPtr) -> libc::c_float;
 	pub fn ivengineclient_getlocalplayer(engine: IVEngineClientPtr) -> libc::c_int;
 	pub fn ivengineclient_getplayername(engine: IVEngineClientPtr, ent: C_BaseEntityPtr, buf: *mut u8, bufsize: libc::size_t) -> libc::size_t;
 	pub fn ivengineclient_setviewangles(engine: IVEngineClientPtr, angles: &QAngle);
 
 	pub fn getptr_ienginetrace() -> IEngineTracePtr; // MAYBE NULL
-	pub fn ienginetrace_traceray(enginetrace: IEngineTracePtr, ray: &Ray_t, mask: u32, filter: *mut ITraceFilter, trace: &mut trace_t);
+	pub fn ienginetrace_traceray(enginetrace: IEngineTracePtr, ray: &Ray_t, mask: u32, filter: ITraceFilterPtr, trace: &mut trace_t);
 	
 	pub fn getptr_icliententitylist() -> IClientEntityListPtr; // MAYBE NULL
-	pub fn icliententitylist_getcliententity(cliententitylist: IClientEntityListPtr, entidx: libc::c_int) -> *mut C_BaseEntity;
+	pub fn icliententitylist_getcliententity(cliententitylist: IClientEntityListPtr, entidx: libc::c_int) -> C_BaseEntityPtr;
 	pub fn icliententitylist_get_highest_entity_index(entlist: IClientEntityListPtr) -> libc::c_int;
 	
 	pub fn getptr_ibaseclientdll() -> IBaseClientDLLPtr; // MAYBE NULL
