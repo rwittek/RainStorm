@@ -27,7 +27,7 @@ pub fn trace_to_entity(ivengineclient: IVEngineClient, icliententitylist: IClien
 	
 	let ray = Ray_t::new(&eyes, &trace_direction);
 
-	ienginetrace.trace_ray(&ray, 0x4600400B, Some(unsafe { get_tracefilter(me) }), &mut trace);
+	ienginetrace.trace_ray(&ray, 0x200400B, Some(unsafe { get_tracefilter(me) }), &mut trace);
 	
 	if trace.base.allsolid  {
 		None
