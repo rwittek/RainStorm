@@ -60,6 +60,9 @@ pub struct ConVar {
 	ptr: raw::ConVarPtr
 }
 
+pub struct IUniformRandomStream {
+	ptr: raw::IUniformRandomStreamPtr
+}
 
 pub fn get_icvar(appsysfactory: &AppSysFactory) -> ICvar {
 	let ptr = unsafe { raw::getptr_icvar(appsysfactory.get_ptr()) };
@@ -67,6 +70,14 @@ pub fn get_icvar(appsysfactory: &AppSysFactory) -> ICvar {
 		return unsafe { ICvar::from_ptr(ptr) };
 	} else {
 		quit!("getptr_icvar returned NULL!\n");
+	}
+}
+pub fn get_iuniformrandomstream() -> IUniformRandomStream {
+	let ptr = unsafe { raw::getptr_iuniformrandomstream() };
+	if ptr.is_not_null() {
+		return unsafe { IUniformRandomStream::from_ptr(ptr) };
+	} else {
+		quit!("getptr_iuniformrandomstream returned NULL!\n");
 	}
 }
 pub fn get_ivengineclient() -> IVEngineClient {
@@ -112,36 +123,40 @@ pub fn get_ivmodelinfo() -> IVModelInfo {
 pub fn get_tracefilter(me: C_BaseEntity) -> ITraceFilter {
 	unsafe { ITraceFilter::from_ptr(raw::get_tracefilter(me.get_ptr())) }
 }
-pub static IN_ATTACK: libc::c_int = (1 << 0);
-pub static IN_JUMP: libc::c_int = (1 << 1);
-pub static IN_DUCK: libc::c_int = (1 << 2);
-pub static IN_FORWARD: libc::c_int = (1 << 3);
-pub static IN_BACK: libc::c_int = (1 << 4);
-pub static IN_USE: libc::c_int = (1 << 5);
-pub static IN_CANCEL: libc::c_int = (1 << 6);
-pub static IN_LEFT: libc::c_int = (1 << 7);
-pub static IN_RIGHT: libc::c_int = (1 << 8);
-pub static IN_MOVELEFT: libc::c_int = (1 << 9);
-pub static IN_MOVERIGHT: libc::c_int = (1 << 10);
-pub static IN_ATTACK2: libc::c_int = (1 << 11);
-pub static IN_RUN: libc::c_int = (1 << 12);
-pub static IN_RELOAD: libc::c_int = (1 << 13);
-pub static IN_ALT1: libc::c_int = (1 << 14);
-pub static IN_ALT2: libc::c_int = (1 << 15);
-pub static IN_SCORE: libc::c_int = (1 << 16); // Used by client.dll for when scoreboard is held down
-pub static IN_SPEED: libc::c_int = (1 << 17); // Player is holding the speed key
-pub static IN_WALK: libc::c_int = (1 << 18); // Player holding walk key
-pub static IN_ZOOM: libc::c_int = (1 << 19); // Zoom key for HUD zoom
-pub static IN_WEAPON1: libc::c_int = (1 << 20);// weapon defines these bits
-pub static IN_WEAPON2: libc::c_int = (1 << 21);// weapon defines these bits
-pub static IN_BULLRUSH: libc::c_int = (1 << 22);
+pub static IN_ATTACK: i32 = (1 << 0);
+pub static IN_JUMP: i32 = (1 << 1);
+pub static IN_DUCK: i32 = (1 << 2);
+pub static IN_FORWARD: i32 = (1 << 3);
+pub static IN_BACK: i32 = (1 << 4);
+pub static IN_USE: i32 = (1 << 5);
+pub static IN_CANCEL: i32 = (1 << 6);
+pub static IN_LEFT: i32 = (1 << 7);
+pub static IN_RIGHT: i32 = (1 << 8);
+pub static IN_MOVELEFT: i32 = (1 << 9);
+pub static IN_MOVERIGHT: i32 = (1 << 10);
+pub static IN_ATTACK2: i32 = (1 << 11);
+pub static IN_RUN: i32 = (1 << 12);
+pub static IN_RELOAD: i32 = (1 << 13);
+pub static IN_ALT1: i32 = (1 << 14);
+pub static IN_ALT2: i32 = (1 << 15);
+pub static IN_SCORE: i32 = (1 << 16); // Used by client.dll for when scoreboard is held down
+pub static IN_SPEED: i32 = (1 << 17); // Player is holding the speed key
+pub static IN_WALK: i32 = (1 << 18); // Player holding walk key
+pub static IN_ZOOM: i32 = (1 << 19); // Zoom key for HUD zoom
+pub static IN_WEAPON1: i32 = (1 << 20);// weapon defines these bits
+pub static IN_WEAPON2: i32 = (1 << 21);// weapon defines these bits
+pub static IN_BULLRUSH: i32 = (1 << 22);
+
+pub struct CBaseHandle {
+	index: libc::c_long
+}
 
 pub struct CBaseTrace {
 	startpos: Vector,
 	endpos: Vector,
 	plane: cplane_t,
 	fraction: libc::c_float,
-	contents: libc::c_int,
+	contents: i32,
 	dispFlags: u16,
 	pub allsolid: bool,
 	startsolid: bool
@@ -151,10 +166,10 @@ pub struct trace_t {
 	pub base: CBaseTrace,	// note, this is actually inheritance in C++
 	fractionleftsurface: libc::c_float,
 	surface: csurface_t,
-	pub hitgroup: libc::c_int,
+	pub hitgroup: i32,
 	pub physicsbone: libc::c_short,
 	pub ent: raw::C_BaseEntityPtr,
-	pub hitbox: libc::c_int
+	pub hitbox: i32
 }
 
 pub struct QAngle {
@@ -246,7 +261,7 @@ impl C_BaseEntity {
 	pub fn worldspacecenter(&self) -> Vector {
 		unsafe { raw::c_baseentity_worldspacecenter(self.get_ptr()) }
 	}
-	pub fn get_index(&self) -> libc::c_int {
+	pub fn get_index(&self) -> i32 {
 		unsafe { raw::c_baseentity_getindex(self.get_ptr()) }
 	}
 	pub fn get_life_state(&self) -> i8 {
@@ -265,10 +280,10 @@ impl C_BaseEntity {
 			core::str::raw::c_str_to_static_slice(cstr_classname)
 		}
 	}
-	pub unsafe fn mut_ptr_offset<DataType>(&mut self, offset: uint) -> *mut DataType {
+	pub fn mut_ptr_offset<DataType>(&mut self, offset: uint) -> *mut DataType {
 		(((self.get_ptr().to_uint()) + offset) as *mut DataType)
 	}
-	pub unsafe fn ptr_offset<DataType>(&self, offset: uint) -> *const DataType {
+	pub fn ptr_offset<DataType>(&self, offset: uint) -> *const DataType {
 		(((self.get_ptr().to_uint()) + offset) as *const DataType)
 	}
 }
@@ -294,37 +309,55 @@ impl C_BaseAnimating {
 	pub fn get_ptr(&self) -> raw::C_BaseAnimatingPtr {
 		self.ptr
 	}
-	pub fn get_hitbox_position(&self, modelinfo: IVModelInfo, hitbox: libc::c_int) -> Vector {
+	pub fn get_hitbox_position(&self, modelinfo: IVModelInfo, hitbox: i32) -> Vector {
 		unsafe { 
 			let mut origin = core::mem::uninitialized();
 			raw::c_baseanimating_gethitboxposition(self.get_ptr(), modelinfo.get_ptr(), hitbox, &mut origin);
 			origin
 		}
 	}
-	pub fn get_bone_position(&self, modelinfo: IVModelInfo, bone: libc::c_int) -> Vector {
+	pub fn get_bone_position(&self, modelinfo: IVModelInfo, bone: i32) -> Vector {
 		unsafe { 
 			let mut origin = core::mem::uninitialized();
 			raw::c_baseanimating_getboneposition(self.get_ptr(), modelinfo.get_ptr(), bone, &mut origin);
 			origin
 		}
 	}
-	pub fn get_num_bones(&self, modelinfo: IVModelInfo) -> libc::c_int {
+	pub fn get_num_bones(&self, modelinfo: IVModelInfo) -> i32 {
 		unsafe {
 			raw::c_baseanimating_getnumbones(self.get_ptr(), modelinfo.get_ptr())
 		}
 	}
-	pub fn get_num_hitboxes(&self, modelinfo: IVModelInfo) -> libc::c_int {
+	pub fn get_num_hitboxes(&self, modelinfo: IVModelInfo) -> i32 {
 		unsafe {
 			raw::c_baseanimating_getnumhitboxes(self.get_ptr(), modelinfo.get_ptr())
 		}
 	}
 }
 impl IBaseClientDLL {
-	pub unsafe fn get_ptr(&self) -> raw::IBaseClientDLLPtr {
+	pub fn get_ptr(&self) -> raw::IBaseClientDLLPtr {
 		self.ptr
 	}
 	pub unsafe fn from_ptr(ptr: raw::IBaseClientDLLPtr) -> IBaseClientDLL {
 		IBaseClientDLL { ptr: ptr }
+	}
+}
+impl IUniformRandomStream {
+	pub fn get_ptr(&self) -> raw::IUniformRandomStreamPtr {
+		self.ptr
+	}
+	pub unsafe fn from_ptr(ptr: raw::IUniformRandomStreamPtr) -> IUniformRandomStream {
+		IUniformRandomStream { ptr: ptr }
+	}
+	pub fn set_seed(&self, seed: i32) {
+		unsafe {
+			raw::iuniformrandomstream_set_seed(self.get_ptr(), seed);
+		}
+	}
+	pub fn random_int(&self, minval: i32, maxval: i32) -> i32 {
+		unsafe {
+			raw::iuniformrandomstream_random_int(self.get_ptr(), minval, maxval)
+		}
 	}
 }
 		
@@ -350,6 +383,21 @@ impl Vector {
 			temp
 		}
 	}
+	pub fn norm(&self) -> Vector {
+		let len = self.length();
+		Vector {
+			x: self.x / len,
+			y: self.y / len,
+			z: self.z / len
+		}
+	}
+			
+	pub fn dotproduct(&self, other: &Vector) -> f32 {
+		self.x * other.x
+		+ self.y * other.y
+		+ self.z * other.z
+	}
+			
 }
 impl QAngle {
 	pub fn to_vector(&self) -> Vector {
@@ -375,10 +423,10 @@ impl IVEngineClient {
 	pub unsafe fn from_ptr(ptr: raw::IVEngineClientPtr) -> IVEngineClient {
 		IVEngineClient { ptr: ptr }
 	}
-	pub fn get_ptr(&self) -> raw::IVEngineClientPtr {
+	pub fn get_ptr(self) -> raw::IVEngineClientPtr {
 		self.ptr
 	}
-	pub fn client_cmd(&mut self, command: &'static str) -> Result<(), &'static str> {
+	pub fn client_cmd(self, command: &'static str) -> Result<(), &'static str> {
 		let mut buf = [0u8, ..256];
 		if command.len() >= buf.len() {
 			return Err("Buffer overflow!");
@@ -389,18 +437,18 @@ impl IVEngineClient {
 		
 		Ok(())
 	}
-	pub fn time(&mut self) -> f32 {
+	pub fn time(self) -> f32 {
 		unsafe { raw::ivengineclient_time(self.get_ptr()) } 
 	}
-	pub fn get_local_player(&self) -> libc::c_int {
+	pub fn get_local_player(self) -> i32 {
 		unsafe { raw::ivengineclient_getlocalplayer(self.get_ptr()) }
 	}
-	pub fn get_player_name(&self, ent: C_BaseEntity, buf: &mut [u8]) -> u32 {
+	pub fn get_player_name(self, ent: C_BaseEntity, buf: &mut [u8]) -> u32 {
 		unsafe {
 			raw::ivengineclient_getplayername(self.get_ptr(), ent.get_ptr(), buf.repr().data as *mut u8, buf.repr().len as u32)
 		}
 	}
-	pub fn set_viewangles(&mut self, angles: &QAngle) {
+	pub fn set_viewangles(self, angles: &QAngle) {
 		unsafe {
 			raw::ivengineclient_setviewangles(self.get_ptr(), angles)
 		}
@@ -413,7 +461,7 @@ impl IClientEntityList {
 	pub fn get_ptr(&self) -> raw::IClientEntityListPtr {
 		self.ptr
 	}
-	pub fn get_client_entity(&self, entidx: libc::c_int) -> Option<C_BaseEntity> {
+	pub fn get_client_entity(&self, entidx: i32) -> Option<C_BaseEntity> {
 		unsafe {
 			let ptr = raw::icliententitylist_getcliententity(self.get_ptr(), entidx);
 			if ptr.is_not_null() {
@@ -423,7 +471,18 @@ impl IClientEntityList {
 			}
 		}
 	}
-	pub fn get_highest_entity_index(&self) -> libc::c_int {
+
+	pub fn get_client_entity_from_handle(&self, handle: CBaseHandle) -> Option<C_BaseEntity> {
+		unsafe {
+			let ptr = raw::icliententitylist_getcliententityfromhandle(self.get_ptr(), handle);
+			if ptr.is_not_null() {
+				Some(C_BaseEntity::from_ptr(ptr))
+			} else {
+				None
+			}
+		}
+	}
+	pub fn get_highest_entity_index(&self) -> i32 {
 		unsafe { raw::icliententitylist_get_highest_entity_index(self.get_ptr()) }
 	}
 }
@@ -451,7 +510,7 @@ impl IEngineTrace {
 	}
 }
 pub enum ConVarValue {
-	Int(libc::c_int),
+	Int(i32),
 	Str(CString)
 }
 

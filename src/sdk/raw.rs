@@ -1,6 +1,6 @@
 use libc;
 use core::prelude::*;
-use super::{trace_t, Ray_t, Vector, QAngle};
+use super::{trace_t, Ray_t, Vector, QAngle, CBaseHandle};
 use CString;
 use core;
 
@@ -55,6 +55,7 @@ ptr_wrapper!(IVModelInfoPtr)
 ptr_wrapper!(INetChannelPtr)
 ptr_wrapper!(INetMessagePtr)
 ptr_wrapper!(ITraceFilterPtr)
+ptr_wrapper!(IUniformRandomStreamPtr)
 
 extern "C" {
 	pub fn getptr_ivengineclient() -> IVEngineClientPtr; // MAYBE NULL
@@ -69,10 +70,15 @@ extern "C" {
 	
 	pub fn getptr_icliententitylist() -> IClientEntityListPtr; // MAYBE NULL
 	pub fn icliententitylist_getcliententity(cliententitylist: IClientEntityListPtr, entidx: libc::c_int) -> C_BaseEntityPtr;
+	pub fn icliententitylist_getcliententityfromhandle(cliententitylist: IClientEntityListPtr, handle: CBaseHandle) -> C_BaseEntityPtr;
 	pub fn icliententitylist_get_highest_entity_index(entlist: IClientEntityListPtr) -> libc::c_int;
 	
 	pub fn getptr_ibaseclientdll() -> IBaseClientDLLPtr; // MAYBE NULL
 	pub fn getptr_icvar(app_sys_factory: AppSysFactoryPtr) -> ICvarPtr;
+	
+	pub fn getptr_iuniformrandomstream() -> IUniformRandomStreamPtr;
+	pub fn iuniformrandomstream_set_seed(stream: IUniformRandomStreamPtr, seed: libc::c_int);
+	pub fn iuniformrandomstream_random_int(stream: IUniformRandomStreamPtr, minval: libc::c_int, maxval: libc::c_int) -> libc::c_int;
 	
 	pub fn trace_t_gethitgroup(trace: *const trace_t) -> libc::c_int;
 	pub fn c_baseentity_getorigin(ent: C_BaseEntityPtr) -> Vector;
@@ -108,7 +114,7 @@ extern "C" {
 	pub fn get_netchannel_sendnetmsg_trampoline() -> *const ();
 	pub fn get_hooked_getusercmd() -> *const ();
 	pub fn ismousedown() -> bool;
-	
+	pub fn get_critbucket_contents(ent: C_BaseEntityPtr) -> libc::c_float;
 	pub fn calc_seed_from_command_number(cmdnum: libc::c_int) -> libc::c_int;
 	pub fn get_tracefilter(me: C_BaseEntityPtr) -> ITraceFilterPtr;
 }

@@ -12,6 +12,7 @@ pub struct NoSpread {
 	target_seed: i32,
 }
 
+
 // a good command number is 2076615043
 impl Cheat for NoSpread {
 	fn new() -> NoSpread {

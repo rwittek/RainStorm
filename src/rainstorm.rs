@@ -102,11 +102,13 @@ pub struct GamePointers {
 	ienginetrace: sdk::IEngineTrace,
 	appsysfactory: Option<sdk::AppSysFactory>,
 	ivmodelinfo: sdk::IVModelInfo,
-	icvar: Option<sdk::ICvar>
+	icvar: Option<sdk::ICvar>,
+	iuniformrandomstream: sdk::IUniformRandomStream
 }
 
 impl GamePointers {
 	pub fn load() -> GamePointers {
+		log!("Loading GamePointers...\n");
 		GamePointers {
 			ivengineclient: sdk::get_ivengineclient(),
 			ibaseclientdll: sdk::get_ibaseclientdll(),
@@ -115,6 +117,7 @@ impl GamePointers {
 			ivmodelinfo: sdk::get_ivmodelinfo(),
 			appsysfactory: None,
 			icvar: None,
+			iuniformrandomstream: sdk::get_iuniformrandomstream()
 		}
 	}
 }
@@ -190,7 +193,7 @@ pub extern "C" fn rainstorm_command_cb(c_arguments: *const libc::c_char) {
 #[no_mangle]
 pub extern "C" fn rainstorm_init(log_fd: libc::c_int, hooked_init_trampoline: *const (), hooked_createmove_trampoline: *const ()) {
 	unsafe { let _ = logging::set_fd(log_fd).ok().unwrap(); }
-	log!("Rainstorm starting up!");
+	log!("Rainstorm starting up!\n");
 
 	cheats::cheatmgr_setup();
 	

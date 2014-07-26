@@ -24,7 +24,8 @@
 #endif
 
 // Hacky
-#if defined ( TF_CLIENT_DLL ) || defined ( TF_DLL )
+
+#if 0 // defined ( TF_CLIENT_DLL ) || defined ( TF_DLL )
 #include "econ_entity.h"
 #endif // TF_CLIENT_DLL || TF_DLL
 

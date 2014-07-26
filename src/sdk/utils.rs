@@ -1,10 +1,11 @@
 use core::prelude::*;
+use GamePointers;
 use super::{get_tracefilter, IVEngineClient, IClientEntityList, IEngineTrace, trace_t, Ray_t, QAngle, C_BaseEntity, C_BaseAnimating, raw};
 use sdk;
 use libc;
 
 pub fn trace_to_entity(ivengineclient: IVEngineClient, icliententitylist: IClientEntityList,
-		ienginetrace: IEngineTrace, viewangles: &QAngle) -> Option<C_BaseEntity> {
+		ienginetrace: IEngineTrace, viewangles: &QAngle) -> Option<(C_BaseEntity, i32)> {
 	let mut trace = unsafe { trace_t::new() };
 	
 	let localplayer_entidx = ivengineclient.get_local_player();
@@ -27,17 +28,29 @@ pub fn trace_to_entity(ivengineclient: IVEngineClient, icliententitylist: IClien
 	
 	let ray = Ray_t::new(&eyes, &trace_direction);
 
-	ienginetrace.trace_ray(&ray, 0x200400B, Some(unsafe { get_tracefilter(me) }), &mut trace);
+	ienginetrace.trace_ray(&ray, 0x4600400B, Some(unsafe { get_tracefilter(me) }), &mut trace);
 	
 	if trace.base.allsolid  {
 		None
 	} else if trace.ent.is_not_null() {
-		Some( unsafe { C_BaseEntity::from_ptr(trace.ent) })
+		Some( unsafe { (C_BaseEntity::from_ptr(trace.ent), trace.hitbox )})
 	} else {
 		None
 	}
 }
 
+pub fn is_commandnum_critical(ptrs: &GamePointers, weapon: sdk::C_BaseEntity, ismelee: bool, commandnum: i32) -> bool {
+	let index = match ismelee {
+		true => (weapon.get_index() << 16) | (ptrs.ivengineclient.get_local_player() << 8),
+		false => (weapon.get_index() << 8) | ptrs.ivengineclient.get_local_player()
+	};
+
+	let global_seed = unsafe { raw::calc_seed_from_command_number(commandnum) };
+	
+	ptrs.iuniformrandomstream.set_seed(global_seed ^ index);
+	
+	ptrs.iuniformrandomstream.random_int(0, 9999) < match ismelee { true => 1500, false => 200 }
+}
 /// Iterates through all entities.
 pub struct EntityIterator {
 	entlist: IClientEntityList,

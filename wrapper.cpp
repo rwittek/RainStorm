@@ -17,6 +17,7 @@
 
 #define _USRDLL
 #define TF2BASE_EXPORTS
+#define TF_CLIENT_DLL
 #define CLIENT_DLL
 #define private public
 #define protected public
@@ -569,7 +570,9 @@ extern "C" float get_current_latency(IVEngineClient *engine) {
 	float netlag = get_current_inetchannel(engine)->GetLatency(0);
 	return netlag;
 }
-
+extern "C" float get_critbucket_contents(C_BaseCombatWeapon *wep) {
+	return wep->m_flCritTokenBucket;
+}
 DWORD WINAPI startup_thread( LPVOID lpArguments ) {
 	logfile = fopen("rainstorm_debug.txt", "w");
 	rainstorm_init(fileno(logfile), (void*)&hooked_init_trampoline, (void*)&hooked_createmove_trampoline);
@@ -618,6 +621,11 @@ extern "C" IClientEntityList * getptr_icliententitylist () {
 	if (ClientFactory == NULL) setup_clientfactory();
 	return (IClientEntityList*) ClientFactory ( VCLIENTENTITYLIST_INTERFACE_VERSION, NULL );
 }
+CUniformRandomStream GlobalStream;
+
+extern "C" IUniformRandomStream * getptr_iuniformrandomstream () {
+	return &GlobalStream;
+}
 
 
 extern "C" IVEngineClient * getptr_ivengineclient() {
@@ -641,6 +649,12 @@ extern "C" IVModelInfo * getptr_ivmodelinfo() {
 
 extern "C" IEngineTool * getptr_ienginetool() {
 	return (IEngineTool *) AppSysFactory( VENGINETOOL_INTERFACE_VERSION, NULL );
+}
+extern "C" void iuniformrandomstream_set_seed(IUniformRandomStream *stream, int seed) {
+	stream->SetSeed(seed);
+}
+extern "C" int iuniformrandomstream_random_int(IUniformRandomStream *stream, int minval, int maxval) {
+	return stream->RandomInt(minval, maxval);
 }
 extern "C" void * icvar_findvar(ICvar *icvar, const char *name) {
 	return icvar->FindVar(name);
@@ -708,6 +722,9 @@ extern "C" void ray_t_init(Ray_t &ray, Vector &start, Vector &end) {
 }
 extern "C" IClientEntity *icliententitylist_getcliententity(IClientEntityList *client_entity_list, int ent_index) {
 	return client_entity_list->GetClientEntity(ent_index);
+}
+extern "C" IClientEntity *icliententitylist_getcliententityfromhandle(IClientEntityList *client_entity_list, CBaseHandle handle) {
+	return client_entity_list->GetClientEntityFromHandle(handle);
 }
 
 extern "C" Vector c_baseentity_getorigin(C_BaseEntity *ent) {

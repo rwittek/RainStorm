@@ -29,11 +29,11 @@ pub struct Aimbot {
 	hitbox: Option<i32>,
 	stop_firing: u8,
 	
-	last_interpdata: Option<(f32, sdk::Vector)>,
-	last_last_interpdata: Option<(f32, sdk::Vector)>
+	fovweight: f32,
+	distweight: f32
 }
 
-impl Aimbot {		
+impl Aimbot {
 	fn find_target_spot(&mut self, ptrs: &GamePointers, viewangles: &sdk::QAngle) -> Option<sdk::Vector> {
 		let localplayer_entidx = ptrs.ivengineclient.get_local_player();
 		let me = ptrs.icliententitylist.get_client_entity(localplayer_entidx).unwrap();
@@ -49,34 +49,43 @@ impl Aimbot {
 			eyes.z += (eye_offsets)[2];
 		}
 		let mut max_priority = core::f32::MIN_VALUE; // this is signed
-		let mut best_targ: Option<sdk::Vector> = None;
-		
+		let mut best_targ: Option<(i32, sdk::Vector)> = None;
 		let mut ivengineclient = ptrs.ivengineclient;
 		let mut icliententitylist = ptrs.icliententitylist;
 		let mut ienginetrace = ptrs.ienginetrace;
 		
 		{
-			let prioritize = |pos: sdk::Vector, ent: sdk::C_BaseEntity, targtype: AimbotTargetType| {
+			let current_aim_norm = viewangles.to_vector().norm();
+			let prioritize = |pos: sdk::Vector, ent: sdk::C_BaseEntity, hitbox: Option<i32>, targtype: AimbotTargetType| {
+				
 				let aimvec = pos - eyes;
 				let mut tempangles = aimvec.to_angle();
 				
 				// can we actually see this?
 				match sdk::utils::trace_to_entity(ivengineclient, icliententitylist, ienginetrace, &tempangles) {
-					Some(trace_ent) if trace_ent == ent => (), // OK
-					Some(trace_ent) => {
-						return
+					Some((trace_ent, hit_hitbox)) if trace_ent == ent => {
+						match hitbox {
+							Some(hb) => {
+								if hb != hit_hitbox {
+									return; // we see it, but it's the wrong hitbox!
+								}
+							},
+							None => ()
+						}
 					},
-					None => {
+					_ => {
 						return
 					}
 				}
-
-				let dist = (aimvec).length();
-				let priority = -dist;
+				
+				let distpriority = -1.0 * self.distweight * (aimvec).length(); // farther away = worse target
+				let fovpriority = self.fovweight * aimvec.norm().dotproduct(&current_aim_norm); // closer to current crosshair position = better target
+				let priority = distpriority + fovpriority;
+				//log!("priority: {} from {}, {}\n", priority, distpriority, fovpriority);
 				if priority > max_priority {
 					//log!("target: {}, {}, {}", unsafe {(*ptr).get_index()}, pos, dist);
 					max_priority = priority;
-					best_targ = Some(pos);
+					best_targ = Some((ent.get_index(), pos));
 				}
 			};
 			
@@ -103,18 +112,18 @@ impl Aimbot {
 								
 								let hitbox_pos = baseanimating.get_hitbox_position(ptrs.ivmodelinfo, hitbox);
 			
-								prioritize(hitbox_pos, ent, targtype)
+								prioritize(hitbox_pos, ent, Some(hitbox), targtype)
 							},
 							None => {
 								for hitbox_pos in sdk::utils::HitboxPositionIterator::new(baseanimating, ptrs.ivmodelinfo) {
-									prioritize(hitbox_pos, ent, targtype)
+									prioritize(hitbox_pos, ent, None, targtype)
 								}
 							}
 						}
 					},
 					Sentry | Teleporter | Dispenser | MVMTank => {
 						unsafe {
-							prioritize(ent.worldspacecenter(), ent, targtype)
+							prioritize(ent.worldspacecenter(), ent, None, targtype)
 						}
 					},
 					
@@ -122,43 +131,8 @@ impl Aimbot {
 			}
 		}
 		
-		best_targ
-		/*match best_targ {
-			Some(best_targ) => {
-				//log!("best target: {}\n", best_targ);
-				let interped_target = match self.last_interpdata {
-					Some((last_time, last_targ)) => { match self.last_last_interpdata {
-						Some((last_last_time, last_last_targ)) => {
-							let delta_t = last_time - last_last_time;
-							let delta_p = last_targ - last_last_targ;
-							
-							let latency = unsafe { sdk::get_current_latency(ptrs.ivengineclient) };
-							log!("latency: {}\n", latency);
-							Some(best_targ - (delta_p.scale( latency / delta_t )))
-						}, 
-						None => {
-							log!("meow!\n");
-							self.last_last_interpdata = self.last_interpdata;
-							self.last_interpdata = Some(( unsafe {
-								(*ptrs.ivengineclient).time() }, best_targ));
-							
-							None
-						}
-					}},
-					None => {
-						log!("woof!\n");
-						self.last_interpdata = Some(( unsafe {(*ptrs.ivengineclient).time() }, best_targ));
-						None
-					}
-				};
-		
-				interped_target
-			},
-			None => None
-		}*/
-	
-	}		
-			
+		best_targ.map(|(entidx, pos)| pos)
+	}
 			
 	fn aim_at_target(&self, ptrs: &GamePointers, cmd: &mut sdk::CUserCmd, target: sdk::Vector) {
 		let localplayer_entidx = unsafe {ptrs.ivengineclient.get_local_player()};
@@ -183,7 +157,15 @@ impl Aimbot {
 
 impl Cheat for Aimbot {
 	fn new() -> Aimbot {
-		Aimbot { enabled: false, hitbox: None, stop_firing: 1, last_interpdata: None, last_last_interpdata: None }
+		Aimbot {
+			enabled: false,
+			hitbox: None,
+			stop_firing: 1,
+			
+			// these values are not remotely on the same scale
+			fovweight: 500.0,
+			distweight: 1.0
+		}
 	}
 	fn get_name<'a>(&'a self) -> &'a str {
 		"Aimbot"
@@ -216,12 +198,23 @@ impl Cheat for Aimbot {
 	fn set_config(&mut self, var: &str, val: &[&str]) {
 		match var {
 			"hitbox" => {
-				self.hitbox = Some(::utils::str_to_integral(val[0]));
+				self.hitbox = match val[0] {
+					"all" => None,
+					number => Some(::utils::str_to_integral(number)),
+				};
 				log!("Hitbox: {}\n", self.hitbox);
 			},
 			"stop_firing" => {
 				self.stop_firing = ::utils::str_to_integral(val[0]);
 				log!("Stop firing: {}\n", self.stop_firing);
+			}
+			"distweight" => {
+				self.distweight = ::utils::str_to_integral::<u32>(val[0]) as f32;
+				log!("Distance weight: {}\n", self.distweight);
+			}
+			"fovweight" => {
+				self.fovweight = ::utils::str_to_integral::<u32>(val[0]) as f32;
+				log!("FOV weight: {}\n", self.fovweight);
 			}
 			_ => {}
 		}
