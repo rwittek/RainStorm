@@ -35,11 +35,11 @@ impl Cheat for Crithack {
 		};
 		
 		let mut try_cmdnum = cmd.command_number;
-		if !sdk::utils::is_commandnum_critical(ptrs, wep, self.ismelee, try_cmdnum) {
-			cmd.buttons = cmd.buttons & !sdk::IN_ATTACK;
-		} else {
-			log!("Crit bucket: {}\n", unsafe { sdk::raw::get_critbucket_contents(wep.get_ptr()) });
+		while !sdk::utils::is_commandnum_critical(ptrs, wep, self.ismelee, try_cmdnum) {
+			try_cmdnum = try_cmdnum + 1;
 		}
+		cmd.command_number = try_cmdnum;
+		cmd.random_seed = unsafe { sdk::raw::calc_seed_from_command_number(try_cmdnum) };
 	}
 	fn enable(&mut self) { self.enabled = true; }
 	fn disable(&mut self) { self.enabled = false; }
