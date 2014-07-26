@@ -12,8 +12,8 @@ pub mod namechanger;
 pub mod aimbot;
 pub mod nocmd;
 pub mod nospread;
-pub mod airstuck;
 pub mod crithack;
+pub mod bhop;
 
 pub static mut CHEAT_MANAGER: *mut CheatManager = 0 as *mut CheatManager;
 
@@ -66,7 +66,8 @@ impl CheatManager {
 		let nocmd: Box<nocmd::NoCmd> = box Cheat::new();
 		let nospread: Box<nospread::NoSpread> = box Cheat::new();
 		let crithack: Box<crithack::Crithack> = box Cheat::new();
-	
+		let bhop: Box<bhop::Bunnyhop> = box Cheat::new();
+		
 		log!("Creating CheatManager...\n");
 		let mut mgr = CheatManager { 
 			cheats: Vec::new(),
@@ -82,6 +83,7 @@ impl CheatManager {
 		mgr.cheats.push(triggerbot);
 		mgr.cheats.push(namechanger);
 		mgr.cheats.push(nocmd);
+		mgr.cheats.push(bhop);
 		mgr
 	}
 	pub fn handle_command(&mut self, command: &str, arguments: &[&str]) {
