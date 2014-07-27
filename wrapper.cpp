@@ -570,9 +570,7 @@ extern "C" float get_current_latency(IVEngineClient *engine) {
 	float netlag = get_current_inetchannel(engine)->GetLatency(0);
 	return netlag;
 }
-extern "C" float get_critbucket_contents(C_BaseCombatWeapon *wep) {
-	return wep->m_flCritTokenBucket;
-}
+
 DWORD WINAPI startup_thread( LPVOID lpArguments ) {
 	logfile = fopen("rainstorm_debug.txt", "w");
 	rainstorm_init(fileno(logfile), (void*)&hooked_init_trampoline, (void*)&hooked_createmove_trampoline);

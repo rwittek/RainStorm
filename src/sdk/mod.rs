@@ -4,6 +4,9 @@ pub use libc::c_char;
 pub use self::raw::calc_seed_from_command_number;
 pub use self::raw::get_hooked_getusercmd;
 pub use self::raw::{AppSysFactoryPtr};
+
+pub use self::entities::{BaseEntity, BaseAnimating, BaseCombatWeapon, CombatWeapon, TFPlayer};
+
 use libc;
 use core;
 use core::result::{Result, Ok, Err};
@@ -17,16 +20,10 @@ use core::ptr::RawPtr;
 
 pub use CString;
 
+pub mod entities;
+
 pub mod raw;
 pub mod utils;
-
-pub struct C_BaseAnimating {
-	ptr: raw::C_BaseAnimatingPtr
-}
-
-pub struct C_BaseEntity {
-	ptr: raw::C_BaseEntityPtr
-}
 
 pub struct ITraceFilter {
 	ptr: raw::ITraceFilterPtr
@@ -120,7 +117,7 @@ pub fn get_ivmodelinfo() -> IVModelInfo {
 		quit!("getptr_ivmodelinfo returned NULL!\n");
 	}
 }
-pub fn get_tracefilter(me: C_BaseEntity) -> ITraceFilter {
+pub fn get_tracefilter<EntType: BaseEntity>(me: EntType) -> ITraceFilter {
 	unsafe { ITraceFilter::from_ptr(raw::get_tracefilter(me.get_ptr())) }
 }
 pub static IN_ATTACK: i32 = (1 << 0);
@@ -248,50 +245,15 @@ impl Ray_t {
 		ray
 	}
 }
-impl C_BaseEntity {
-	pub unsafe fn from_ptr(ptr: raw::C_BaseEntityPtr) -> C_BaseEntity {
-		C_BaseEntity { ptr: ptr }
+impl BaseEntity for raw::C_BaseEntityPtr {
+	unsafe fn from_ptr(ptr: raw::C_BaseEntityPtr) -> raw::C_BaseEntityPtr {
+		ptr
 	}
-	pub fn get_ptr(&self) -> raw::C_BaseEntityPtr {
-		self.ptr
+	fn get_ptr(&self) -> raw::C_BaseEntityPtr {
+		*self
 	} 
-	pub fn get_origin(&self) -> Vector {
-		unsafe { raw::c_baseentity_getorigin(self.get_ptr()) }
-	}
-	pub fn worldspacecenter(&self) -> Vector {
-		unsafe { raw::c_baseentity_worldspacecenter(self.get_ptr()) }
-	}
-	pub fn get_index(&self) -> i32 {
-		unsafe { raw::c_baseentity_getindex(self.get_ptr()) }
-	}
-	pub fn get_life_state(&self) -> i8 {
-		unsafe { *(self.ptr_offset::<i8>(0x00A1)) }
-	}
-	pub fn get_team(&self) -> u32 {
-		unsafe {*(self.ptr_offset(0x00AC))}
-	}
-	pub fn get_class(&self) -> u32 {
-		unsafe {*(self.ptr_offset(0x1524))}
-	}
-	pub fn get_classname<'a>(&'a self) -> &'a str {
-		unsafe {
-			let cstr_classname = raw::c_baseentity_getclassname(self.get_ptr());
-			// TODO: null check?
-			core::str::raw::c_str_to_static_slice(cstr_classname)
-		}
-	}
-	pub fn mut_ptr_offset<DataType>(&mut self, offset: uint) -> *mut DataType {
-		(((self.get_ptr().to_uint()) + offset) as *mut DataType)
-	}
-	pub fn ptr_offset<DataType>(&self, offset: uint) -> *const DataType {
-		(((self.get_ptr().to_uint()) + offset) as *const DataType)
-	}
 }
-impl core::cmp::PartialEq for C_BaseEntity {
-	fn eq(&self, other: &C_BaseEntity) -> bool {
-		self.ptr == other.ptr
-	}
-}
+
 
 impl IVModelInfo {
 	pub unsafe fn get_ptr(&self) -> raw::IVModelInfoPtr {
@@ -302,38 +264,6 @@ impl IVModelInfo {
 	}
 }
 
-impl C_BaseAnimating {
-	pub unsafe fn from_ptr(ptr: raw::C_BaseAnimatingPtr) -> C_BaseAnimating {
-		C_BaseAnimating { ptr: ptr }
-	}
-	pub fn get_ptr(&self) -> raw::C_BaseAnimatingPtr {
-		self.ptr
-	}
-	pub fn get_hitbox_position(&self, modelinfo: IVModelInfo, hitbox: i32) -> Vector {
-		unsafe { 
-			let mut origin = core::mem::uninitialized();
-			raw::c_baseanimating_gethitboxposition(self.get_ptr(), modelinfo.get_ptr(), hitbox, &mut origin);
-			origin
-		}
-	}
-	pub fn get_bone_position(&self, modelinfo: IVModelInfo, bone: i32) -> Vector {
-		unsafe { 
-			let mut origin = core::mem::uninitialized();
-			raw::c_baseanimating_getboneposition(self.get_ptr(), modelinfo.get_ptr(), bone, &mut origin);
-			origin
-		}
-	}
-	pub fn get_num_bones(&self, modelinfo: IVModelInfo) -> i32 {
-		unsafe {
-			raw::c_baseanimating_getnumbones(self.get_ptr(), modelinfo.get_ptr())
-		}
-	}
-	pub fn get_num_hitboxes(&self, modelinfo: IVModelInfo) -> i32 {
-		unsafe {
-			raw::c_baseanimating_getnumhitboxes(self.get_ptr(), modelinfo.get_ptr())
-		}
-	}
-}
 impl IBaseClientDLL {
 	pub fn get_ptr(&self) -> raw::IBaseClientDLLPtr {
 		self.ptr
@@ -443,7 +373,7 @@ impl IVEngineClient {
 	pub fn get_local_player(self) -> i32 {
 		unsafe { raw::ivengineclient_getlocalplayer(self.get_ptr()) }
 	}
-	pub fn get_player_name(self, ent: C_BaseEntity, buf: &mut [u8]) -> u32 {
+	pub fn get_player_name<EntType: BaseEntity>(self, ent: EntType, buf: &mut [u8]) -> u32 {
 		unsafe {
 			raw::ivengineclient_getplayername(self.get_ptr(), ent.get_ptr(), buf.repr().data as *mut u8, buf.repr().len as u32)
 		}
@@ -461,22 +391,22 @@ impl IClientEntityList {
 	pub fn get_ptr(&self) -> raw::IClientEntityListPtr {
 		self.ptr
 	}
-	pub fn get_client_entity(&self, entidx: i32) -> Option<C_BaseEntity> {
+	pub fn get_client_entity(&self, entidx: i32) -> Option<raw::C_BaseEntityPtr> {
 		unsafe {
 			let ptr = raw::icliententitylist_getcliententity(self.get_ptr(), entidx);
 			if ptr.is_not_null() {
-				Some(C_BaseEntity::from_ptr(ptr))
+				Some(ptr)
 			} else {
 				None
 			}
 		}
 	}
 
-	pub fn get_client_entity_from_handle(&self, handle: CBaseHandle) -> Option<C_BaseEntity> {
+	pub fn get_client_entity_from_handle(&self, handle: CBaseHandle) -> Option<raw::C_BaseEntityPtr> {
 		unsafe {
 			let ptr = raw::icliententitylist_getcliententityfromhandle(self.get_ptr(), handle);
 			if ptr.is_not_null() {
-				Some(C_BaseEntity::from_ptr(ptr))
+				Some(ptr)
 			} else {
 				None
 			}

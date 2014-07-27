@@ -2,6 +2,9 @@ use {Cheat, GamePointers};
 use sdk;
 use core;
 use core::prelude::*;
+use sdk::BaseAnimating;
+use sdk::BaseEntity;
+use sdk::TFPlayer;
 
 #[deriving(Show)]
 pub enum AimbotTargetType {
@@ -9,9 +12,9 @@ pub enum AimbotTargetType {
 	Sentry,
 	Teleporter,
 	/* poot */ Dispenser, /* here */
-	MVMTank
+	MVMTank,
 }
-fn get_target_type(ptrs: &GamePointers, ent: sdk::C_BaseEntity) -> Option<AimbotTargetType> {
+fn get_target_type<EntType: sdk::BaseEntity>(ptrs: &GamePointers, ent: EntType) -> Option<AimbotTargetType> {
 	let classname = ent.get_classname();
 	
 	match classname {
@@ -36,7 +39,7 @@ pub struct Aimbot {
 impl Aimbot {
 	fn find_target_spot(&mut self, ptrs: &GamePointers, viewangles: &sdk::QAngle) -> Option<sdk::Vector> {
 		let localplayer_entidx = ptrs.ivengineclient.get_local_player();
-		let me = ptrs.icliententitylist.get_client_entity(localplayer_entidx).unwrap();
+		let me: TFPlayer = unsafe { BaseEntity::from_ptr( ptrs.icliententitylist.get_client_entity(localplayer_entidx).unwrap())};
 
 		let mut direction = sdk::Vector::new();
 
@@ -56,14 +59,14 @@ impl Aimbot {
 		
 		{
 			let current_aim_norm = viewangles.to_vector().norm();
-			let prioritize = |pos: sdk::Vector, ent: sdk::C_BaseEntity, hitbox: Option<i32>, targtype: AimbotTargetType| {
+			let prioritize = |pos: sdk::Vector, ent: &sdk::BaseEntity, hitbox: Option<i32>, targtype: AimbotTargetType| {
 				
 				let aimvec = pos - eyes;
 				let mut tempangles = aimvec.to_angle();
 				
 				// can we actually see this?
 				match sdk::utils::trace_to_entity(ivengineclient, icliententitylist, ienginetrace, &tempangles) {
-					Some((trace_ent, hit_hitbox)) if trace_ent == ent => {
+					Some((trace_ent, hit_hitbox)) if trace_ent == ent.get_ptr() => {
 						match hitbox {
 							Some(hb) => {
 								if hb != hit_hitbox {
@@ -78,9 +81,15 @@ impl Aimbot {
 					}
 				}
 				
+				let targtypepriority = match targtype {
+					Player => 0.0,
+					Dispenser | Teleporter => -500.0,
+					Sentry => 1024.0, // sentries have 1024HU range
+					MVMTank => 0.0, // I don't play enough MVM to know what to put here
+				};
 				let distpriority = -1.0 * self.distweight * (aimvec).length(); // farther away = worse target
 				let fovpriority = self.fovweight * aimvec.norm().dotproduct(&current_aim_norm); // closer to current crosshair position = better target
-				let priority = distpriority + fovpriority;
+				let priority = targtypepriority + distpriority + fovpriority;
 				//log!("priority: {} from {}, {}\n", priority, distpriority, fovpriority);
 				if priority > max_priority {
 					//log!("target: {}, {}, {}", unsafe {(*ptr).get_index()}, pos, dist);
@@ -97,33 +106,38 @@ impl Aimbot {
 							None => None
 						}
 					})
-					.filter(|&(ptr, targtype)|  ptr.get_team() != me.get_team() ) // only enemies
-					.filter(|&(ptr, targtype)|  ptr.get_life_state() == 0 ) { // only alive entities
-					
+					.filter(|&(ptr, targtype)| match targtype {
+						Player => {
+							let player: TFPlayer = unsafe { BaseEntity::from_ptr(ptr) };
+							
+							player.get_team() != me.get_team() && player.get_life_state() == 0
+						},
+						_ => true
+					}) {
+
 				match targtype {
 					Player => { 	
-						// FIXME: Ew.
-						let baseanimating = unsafe {
-							sdk::C_BaseAnimating::from_ptr(sdk::raw::C_BaseAnimatingPtr::from_uint(ent.get_ptr().to_uint()))
+						let player: sdk::TFPlayer = unsafe {
+							sdk::BaseEntity::from_ptr(ent.get_ptr())
 						};
 							
 						match self.hitbox {
 							Some(hitbox) => {
 								
-								let hitbox_pos = baseanimating.get_hitbox_position(ptrs.ivmodelinfo, hitbox);
+								let hitbox_pos = player.get_hitbox_position(ptrs.ivmodelinfo, hitbox);
 			
-								prioritize(hitbox_pos, ent, Some(hitbox), targtype)
+								prioritize(hitbox_pos, &ent as &BaseEntity, Some(hitbox), targtype)
 							},
 							None => {
-								for hitbox_pos in sdk::utils::HitboxPositionIterator::new(baseanimating, ptrs.ivmodelinfo) {
-									prioritize(hitbox_pos, ent, None, targtype)
+								for hitbox_pos in sdk::utils::HitboxPositionIterator::new(player, ptrs.ivmodelinfo) {
+									prioritize(hitbox_pos, &ent as &BaseEntity, None, targtype)
 								}
 							}
 						}
 					},
 					Sentry | Teleporter | Dispenser | MVMTank => {
 						unsafe {
-							prioritize(ent.worldspacecenter(), ent, None, targtype)
+							prioritize(ent.worldspacecenter(), &ent as &BaseEntity, None, targtype)
 						}
 					},
 					
