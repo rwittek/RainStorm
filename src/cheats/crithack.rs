@@ -4,8 +4,8 @@ use sdk;
 use libc;
 use core::prelude::*;
 use core;
-use sdk::BaseEntity;
-use sdk::BaseCombatWeapon;
+use sdk::Entity;
+use sdk::CombatWeapon;
 
 pub struct Crithack {
 	enabled: bool,
@@ -39,9 +39,9 @@ impl Cheat for Crithack {
 		 */
 		let localplayer_entidx = ptrs.ivengineclient.get_local_player();
 		let me = ptrs.icliententitylist.get_client_entity(localplayer_entidx).unwrap();
-		let wep: sdk::CombatWeapon = unsafe {
+		let wep: sdk::BaseCombatWeapon = unsafe {
 			match ptrs.icliententitylist.get_client_entity_from_handle(*me.ptr_offset::<sdk::CBaseHandle>(0x0DA8)) {
-				Some(wep) => BaseEntity::from_ptr(wep),
+				Some(wep) => Entity::from_ptr(wep),
 				None => return // no active weapon
 		}
 		};

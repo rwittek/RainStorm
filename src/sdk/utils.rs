@@ -1,7 +1,7 @@
 use core::prelude::*;
 use GamePointers;
 use super::{get_tracefilter, IVEngineClient, IClientEntityList, IEngineTrace, trace_t, Ray_t, QAngle,
-	BaseEntity, BaseAnimating, BaseCombatWeapon, raw};
+	Entity, Animating, BaseCombatWeapon, raw};
 use sdk;
 use libc;
 
@@ -40,7 +40,7 @@ pub fn trace_to_entity(ivengineclient: IVEngineClient, icliententitylist: IClien
 	}
 }
 
-pub fn is_commandnum_critical<WepType: sdk::BaseCombatWeapon>(ptrs: &GamePointers, weapon: WepType, commandnum: i32) -> bool {
+pub fn is_commandnum_critical<WepType: sdk::CombatWeapon>(ptrs: &GamePointers, weapon: WepType, commandnum: i32) -> bool {
 	let index = match weapon.is_melee() {
 		true => (weapon.get_index() << 16) | (ptrs.ivengineclient.get_local_player() << 8),
 		false => (weapon.get_index() << 8) | ptrs.ivengineclient.get_local_player()
@@ -94,12 +94,12 @@ pub struct HitboxPositionIterator<EntType> {
 	current_hitbox: libc::c_int,
 	num_hitboxes: libc::c_int
 }
-impl<EntType: BaseAnimating> HitboxPositionIterator<EntType> {
+impl<EntType: Animating> HitboxPositionIterator<EntType> {
 	pub fn new(ent: EntType, modelinfo: sdk::IVModelInfo) -> HitboxPositionIterator<EntType> {
 		HitboxPositionIterator { ent: ent, modelinfo: modelinfo, current_hitbox: 0, num_hitboxes: ent.get_num_hitboxes(modelinfo) }
 	}
 }
-impl<EntType: BaseAnimating> Iterator<sdk::Vector> for HitboxPositionIterator<EntType> {
+impl<EntType: Animating> Iterator<sdk::Vector> for HitboxPositionIterator<EntType> {
 	fn next(&mut self) -> Option<sdk::Vector> {
 		if self.current_hitbox == self.num_hitboxes {
 			None

@@ -4,7 +4,7 @@ use sdk;
 use libc;
 use core::prelude::*;
 use core;
-use sdk::BaseEntity;
+use sdk::Entity;
 
 pub struct Bunnyhop {
 	enabled: bool,

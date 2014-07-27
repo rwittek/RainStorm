@@ -5,7 +5,7 @@ pub use self::raw::calc_seed_from_command_number;
 pub use self::raw::get_hooked_getusercmd;
 pub use self::raw::{AppSysFactoryPtr};
 
-pub use self::entities::{BaseEntity, BaseAnimating, BaseCombatWeapon, CombatWeapon, TFPlayer};
+pub use self::entities::{Entity, Animating, BaseCombatWeapon, CombatWeapon, TFPlayer, OnTeam, Object, BaseObject};
 
 use libc;
 use core;
@@ -117,7 +117,7 @@ pub fn get_ivmodelinfo() -> IVModelInfo {
 		quit!("getptr_ivmodelinfo returned NULL!\n");
 	}
 }
-pub fn get_tracefilter<EntType: BaseEntity>(me: EntType) -> ITraceFilter {
+pub fn get_tracefilter<EntType: Entity>(me: EntType) -> ITraceFilter {
 	unsafe { ITraceFilter::from_ptr(raw::get_tracefilter(me.get_ptr())) }
 }
 pub static IN_ATTACK: i32 = (1 << 0);
@@ -245,7 +245,7 @@ impl Ray_t {
 		ray
 	}
 }
-impl BaseEntity for raw::C_BaseEntityPtr {
+impl Entity for raw::C_BaseEntityPtr {
 	unsafe fn from_ptr(ptr: raw::C_BaseEntityPtr) -> raw::C_BaseEntityPtr {
 		ptr
 	}
@@ -373,7 +373,7 @@ impl IVEngineClient {
 	pub fn get_local_player(self) -> i32 {
 		unsafe { raw::ivengineclient_getlocalplayer(self.get_ptr()) }
 	}
-	pub fn get_player_name<EntType: BaseEntity>(self, ent: EntType, buf: &mut [u8]) -> u32 {
+	pub fn get_player_name<EntType: Entity>(self, ent: EntType, buf: &mut [u8]) -> u32 {
 		unsafe {
 			raw::ivengineclient_getplayername(self.get_ptr(), ent.get_ptr(), buf.repr().data as *mut u8, buf.repr().len as u32)
 		}

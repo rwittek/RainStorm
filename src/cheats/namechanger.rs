@@ -5,7 +5,7 @@ use libc;
 use GamePointers;
 use rand::Rng;
 use core::raw::Repr;
-use sdk::BaseEntity;
+use sdk::Entity;
 
 pub struct NameChanger {
 	enabled: bool,

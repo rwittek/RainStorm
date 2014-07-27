@@ -2,9 +2,11 @@ use {Cheat, GamePointers};
 use sdk;
 use core;
 use core::prelude::*;
-use sdk::BaseAnimating;
-use sdk::BaseEntity;
+use sdk::Animating;
+use sdk::Entity;
 use sdk::TFPlayer;
+use sdk::BaseObject;
+use sdk::OnTeam;
 
 #[deriving(Show)]
 pub enum AimbotTargetType {
@@ -14,7 +16,7 @@ pub enum AimbotTargetType {
 	/* poot */ Dispenser, /* here */
 	MVMTank,
 }
-fn get_target_type<EntType: sdk::BaseEntity>(ptrs: &GamePointers, ent: EntType) -> Option<AimbotTargetType> {
+fn get_target_type<EntType: Entity>(ptrs: &GamePointers, ent: EntType) -> Option<AimbotTargetType> {
 	let classname = ent.get_classname();
 	
 	match classname {
@@ -39,7 +41,7 @@ pub struct Aimbot {
 impl Aimbot {
 	fn find_target_spot(&mut self, ptrs: &GamePointers, viewangles: &sdk::QAngle) -> Option<sdk::Vector> {
 		let localplayer_entidx = ptrs.ivengineclient.get_local_player();
-		let me: TFPlayer = unsafe { BaseEntity::from_ptr( ptrs.icliententitylist.get_client_entity(localplayer_entidx).unwrap())};
+		let me: TFPlayer = unsafe { Entity::from_ptr( ptrs.icliententitylist.get_client_entity(localplayer_entidx).unwrap())};
 
 		let mut direction = sdk::Vector::new();
 
@@ -59,7 +61,7 @@ impl Aimbot {
 		
 		{
 			let current_aim_norm = viewangles.to_vector().norm();
-			let prioritize = |pos: sdk::Vector, ent: &sdk::BaseEntity, hitbox: Option<i32>, targtype: AimbotTargetType| {
+			let prioritize = |pos: sdk::Vector, ent: &sdk::Entity, hitbox: Option<i32>, targtype: AimbotTargetType| {
 				
 				let aimvec = pos - eyes;
 				let mut tempangles = aimvec.to_angle();
@@ -108,9 +110,13 @@ impl Aimbot {
 					})
 					.filter(|&(ptr, targtype)| match targtype {
 						Player => {
-							let player: TFPlayer = unsafe { BaseEntity::from_ptr(ptr) };
+							let player: TFPlayer = unsafe { Entity::from_ptr(ptr) };
 							
 							player.get_team() != me.get_team() && player.get_life_state() == 0
+						},
+						Sentry | Dispenser | Teleporter => {
+							let object: BaseObject = unsafe { Entity::from_ptr(ptr) };
+							object.get_team() != me.get_team()
 						},
 						_ => true
 					}) {
@@ -118,7 +124,7 @@ impl Aimbot {
 				match targtype {
 					Player => { 	
 						let player: sdk::TFPlayer = unsafe {
-							sdk::BaseEntity::from_ptr(ent.get_ptr())
+							Entity::from_ptr(ent.get_ptr())
 						};
 							
 						match self.hitbox {
@@ -126,18 +132,18 @@ impl Aimbot {
 								
 								let hitbox_pos = player.get_hitbox_position(ptrs.ivmodelinfo, hitbox);
 			
-								prioritize(hitbox_pos, &ent as &BaseEntity, Some(hitbox), targtype)
+								prioritize(hitbox_pos, &ent as &Entity, Some(hitbox), targtype)
 							},
 							None => {
 								for hitbox_pos in sdk::utils::HitboxPositionIterator::new(player, ptrs.ivmodelinfo) {
-									prioritize(hitbox_pos, &ent as &BaseEntity, None, targtype)
+									prioritize(hitbox_pos, &ent as &Entity, None, targtype)
 								}
 							}
 						}
 					},
 					Sentry | Teleporter | Dispenser | MVMTank => {
 						unsafe {
-							prioritize(ent.worldspacecenter(), &ent as &BaseEntity, None, targtype)
+							prioritize(ent.worldspacecenter(), &ent as &Entity, None, targtype)
 						}
 					},
 					

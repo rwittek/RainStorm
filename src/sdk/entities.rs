@@ -2,7 +2,7 @@ use super::raw;
 use super::{Vector, IVModelInfo};
 use core;
 
-pub trait BaseEntity: core::kinds::Copy {
+pub trait Entity: core::kinds::Copy {
 	unsafe fn from_ptr(ptr: raw::C_BaseEntityPtr) -> Self;
 	fn get_ptr(&self) -> raw::C_BaseEntityPtr;
 	
@@ -37,7 +37,7 @@ pub trait BaseEntity: core::kinds::Copy {
 	}
 }*/
 
-pub trait BaseAnimating: BaseEntity {
+pub trait Animating: Entity {
 	fn get_hitbox_position(&self, modelinfo: IVModelInfo, hitbox: i32) -> Vector {
 		unsafe { 
 			let mut origin = core::mem::uninitialized();
@@ -64,24 +64,27 @@ pub trait BaseAnimating: BaseEntity {
 	}
 }
 
-pub trait BaseCombatWeapon: BaseAnimating {
-	fn is_melee(&self) -> bool;
+pub trait OnTeam: Entity {
+	fn get_team(&self) -> u32;
 }
 
+pub trait CombatWeapon: Animating {
+	fn is_melee(&self) -> bool;
+}
 // FIXME: this is weird
-pub struct CombatWeapon {
+pub struct BaseCombatWeapon {
 	ptr: raw::C_BaseEntityPtr
 }
-impl BaseEntity for CombatWeapon {
+impl Entity for BaseCombatWeapon {
 	fn get_ptr(&self) -> raw::C_BaseEntityPtr {
 		self.ptr
 	}
-	unsafe fn from_ptr(ptr: raw::C_BaseEntityPtr) -> CombatWeapon {
-		CombatWeapon {ptr: ptr}
+	unsafe fn from_ptr(ptr: raw::C_BaseEntityPtr) -> BaseCombatWeapon {
+		BaseCombatWeapon {ptr: ptr}
 	}
 }
-impl BaseAnimating for CombatWeapon {}
-impl BaseCombatWeapon for CombatWeapon {
+impl Animating for BaseCombatWeapon {}
+impl CombatWeapon for BaseCombatWeapon {
 	fn is_melee(&self) -> bool {
 		true // FIXME
 	}
@@ -95,14 +98,11 @@ impl TFPlayer {
 	pub fn get_life_state(&self) -> i8 {
 		unsafe { *(self.ptr_offset::<i8>(0x00A1)) }
 	}
-	pub fn get_team(&self) -> u32 {
-		unsafe {*(self.ptr_offset(0x00AC))}
-	}
 	pub fn get_class(&self) -> u32 {
 		unsafe {*(self.ptr_offset(0x1524))}
 	}
 }
-impl BaseEntity for TFPlayer {
+impl Entity for TFPlayer {
 	fn get_ptr(&self) -> raw::C_BaseEntityPtr {
 		self.ptr
 	}
@@ -110,4 +110,30 @@ impl BaseEntity for TFPlayer {
 		TFPlayer {ptr: ptr}
 	}
 }
-impl BaseAnimating for TFPlayer {}
+impl Animating for TFPlayer {}
+impl OnTeam for TFPlayer {
+	fn get_team(&self) -> u32 {
+		unsafe {*(self.ptr_offset(0x00AC))}
+	}
+}
+
+pub trait Object: Animating + OnTeam {}
+
+pub struct BaseObject {
+	ptr: raw::C_BaseEntityPtr
+}
+impl Entity for BaseObject {
+	fn get_ptr(&self) -> raw::C_BaseEntityPtr {
+		self.ptr
+	}
+	unsafe fn from_ptr(ptr: raw::C_BaseEntityPtr) -> BaseObject {
+		BaseObject {ptr: ptr}
+	}
+}
+impl Animating for BaseObject {}
+impl OnTeam for BaseObject {
+	fn get_team(&self) -> u32 {
+		unsafe {*(self.ptr_offset(0x00AC))}
+	}
+}
+impl Object for BaseObject {}
