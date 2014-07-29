@@ -1,7 +1,6 @@
 use core::prelude::*;
 use Cheat;
 use sdk;
-use libc;
 use GamePointers;
 use rand::Rng;
 use core::raw::Repr;
@@ -21,7 +20,7 @@ impl Cheat for NameChanger {
 		"NameChanger"
 	}
 	fn postinit(&mut self, ptrs: &GamePointers) {
-		let mut namevar = ptrs.icvar.unwrap().find_var("name");
+		let namevar = ptrs.icvar.unwrap().find_var("name");
 		match namevar {
 			Some(mut name) => unsafe { name.changeandfreeze(::CString::new(::core::mem::transmute("le reddit army xD\0")).unwrap()); log!("name frozen OK :U\n") },
 			None => {quit!("No name CVar? u wot m8\n")}
@@ -35,7 +34,7 @@ impl Cheat for NameChanger {
 		
 		let me = ptrs.icliententitylist.get_client_entity(localplayer_entidx).unwrap();
 		
-		let icvar = unsafe { (ptrs.icvar.unwrap()) };
+		let icvar = ptrs.icvar.unwrap();
 		let mut names: ::Vec<[u8, ..300]> = ::Vec::new();
 		
 		// TODO: some smart timer BS
@@ -53,7 +52,7 @@ impl Cheat for NameChanger {
 				*dst = *src;
 			}
 			
-			if unsafe { ent.get_index() != me.get_index() && ent.get_index() != self.last_victim } {
+			if ent.get_index() != me.get_index() && ent.get_index() != self.last_victim {
 				names.push(buf);
 			}
 		}
@@ -62,11 +61,10 @@ impl Cheat for NameChanger {
 		let maybe_new_name = self.rng.choose(names.as_slice());
 		match maybe_new_name {
 			Some(new_name) => {
-				let mut namevar = icvar.find_var("name");
-				match namevar {
-					Some(mut name) => unsafe { name.setvalue_raw(::sdk::Str(::CString::new_raw(new_name.as_slice().repr().data as *const u8))) },
-					None => {log!("No name CVar? u wot m8\n"); unsafe { libc::exit(1); }}
-				}
+				let mut name = icvar.find_var("name").expect("name cvar not found!");
+				unsafe {name.setvalue_raw(
+					::sdk::Str(::CString::new_raw(new_name.as_slice().repr().data as *const u8))
+				)};
 			},
 			None => {
 				// nobody else on server?

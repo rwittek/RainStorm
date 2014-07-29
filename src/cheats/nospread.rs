@@ -1,9 +1,7 @@
 use Cheat;
 use GamePointers;
 use sdk;
-use libc;
-use core::prelude::*;
-use core;
+
 
 pub struct NoSpread {
 	enabled: bool,
@@ -13,15 +11,14 @@ pub struct NoSpread {
 }
 
 
-// a good command number is 2076615043
 impl Cheat for NoSpread {
 	fn new() -> NoSpread {
-		NoSpread { enabled: false, target_cmdnum: 0, target_seed: 0 }
+		NoSpread { enabled: false, target_cmdnum: 2076615043, target_seed: unsafe { sdk::calc_seed_from_command_number(2076615043) } }
 	}
 	fn get_name<'a>(&'a self) -> &'a str {
 		"NoSpread"
 	}
-	fn process_usercmd(&mut self, ptrs: &GamePointers, cmd: &mut sdk::CUserCmd) {
+	fn process_usercmd(&mut self, _ptrs: &GamePointers, cmd: &mut sdk::CUserCmd) {
 		if !self.enabled {
 			return;
 		}

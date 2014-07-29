@@ -1,7 +1,7 @@
 use core::prelude::*;
 use GamePointers;
-use super::{get_tracefilter, IVEngineClient, IClientEntityList, IEngineTrace, trace_t, Ray_t, QAngle,
-	Entity, Animating, BaseCombatWeapon, raw};
+use super::{get_tracefilter, IClientEntityList, trace_t, Ray_t, QAngle,
+	Entity, Animating, raw};
 use sdk;
 use libc;
 
@@ -30,12 +30,12 @@ pub fn trace_to_entity(ptrs: &GamePointers, viewangles: &QAngle) -> Option<(raw:
 	
 	let ray = Ray_t::new(&eyes, &trace_direction);
 
-	ptrs.ienginetrace.trace_ray(&ray, 0x4600400B, Some(unsafe { get_tracefilter(me) }), &mut trace);
+	ptrs.ienginetrace.trace_ray(&ray, 0x4600400B, Some(get_tracefilter(me)), &mut trace);
 	
 	if trace.base.allsolid  {
 		None
 	} else if trace.ent.is_not_null() {
-		Some( unsafe { (trace.ent, trace.hitbox )})
+		Some((trace.ent, trace.hitbox ))
 	} else {
 		None
 	}
@@ -74,7 +74,7 @@ impl EntityIterator {
 
 impl Iterator<raw::C_BaseEntityPtr> for EntityIterator {
 	fn next(&mut self) -> Option<raw::C_BaseEntityPtr> {
-		while (self.current_index <= self.stop_at) { 
+		while self.current_index <= self.stop_at { 
 			let maybe_ent = self.entlist.get_client_entity(self.current_index);
 			self.current_index += 1;
 

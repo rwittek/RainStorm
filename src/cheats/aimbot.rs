@@ -7,7 +7,7 @@ use sdk::Entity;
 use sdk::TFPlayer;
 use sdk::BaseObject;
 use sdk::OnTeam;
-use sdk::{Scout, Soldier, Pyro, Demoman, Heavy, Engineer, Medic, Sniper, Spy, TFClass};
+use sdk::{Scout, Soldier, Pyro, Demoman, Heavy, Engineer, Medic, Sniper, Spy};
 use sdk::utils;
 
 #[deriving(Show)]
@@ -20,7 +20,7 @@ pub enum AimbotTargetType {
 }
 
 /// Given an entity, determine what type of aimbot target it is.
-fn get_target_type<EntType: Entity>(ptrs: &GamePointers, ent: EntType) -> Option<AimbotTargetType> {
+fn get_target_type<EntType: Entity>(_ptrs: &GamePointers, ent: EntType) -> Option<AimbotTargetType> {
 	let classname = ent.get_classname();
 	
 	match classname {
@@ -50,8 +50,6 @@ impl Aimbot {
 	fn find_target_spot(&mut self, ptrs: &GamePointers, viewangles: &sdk::QAngle) -> Option<sdk::Vector> {
 		let me: TFPlayer = unsafe { Entity::from_ptr( utils::get_local_player_entity(ptrs)) };
 
-		let mut direction = sdk::Vector::new();
-
 		let mut eyes = me.get_origin();
 		
 		unsafe {
@@ -62,16 +60,13 @@ impl Aimbot {
 		}
 		let mut max_priority = core::f32::MIN_VALUE; // this is signed
 		let mut best_targ: Option<(sdk::raw::C_BaseEntityPtr, sdk::Vector)> = None;
-		let mut ivengineclient = ptrs.ivengineclient;
-		let mut icliententitylist = ptrs.icliententitylist;
-		let mut ienginetrace = ptrs.ienginetrace;
 		
 		{
 			let current_aim_norm = viewangles.to_vector().norm();
 			let prioritize = |pos: sdk::Vector, ent: &sdk::Entity, hitbox: Option<i32>, targtype: AimbotTargetType| {
 				
 				let aimvec = pos - eyes;
-				let mut tempangles = aimvec.to_angle();
+				let tempangles = aimvec.to_angle();
 				
 				// can we actually see this?
 				match sdk::utils::trace_to_entity(ptrs, &tempangles) {
@@ -165,16 +160,14 @@ impl Aimbot {
 						}
 					},
 					Sentry | Teleporter | Dispenser | MVMTank => {
-						unsafe {
-							prioritize(ent.worldspacecenter(), &ent as &Entity, None, targtype)
-						}
+						prioritize(ent.worldspacecenter(), &ent as &Entity, None, targtype)
 					},
 					
 				}
 			}
 		}
 		
-		best_targ.map(|(ent, pos)| {
+		best_targ.map(|(_, pos)| {
 			pos
 		})
 		

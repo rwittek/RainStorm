@@ -17,11 +17,14 @@ macro_rules! log(
 )
 
 
+pub fn annoying_workaround() -> ! {
+	unsafe { ::libc::exit(1) }
+}
 
 macro_rules! quit(
 	($($arg:tt)*) => ({
 		log!($($arg)*);
-		unsafe { ::libc::exit(1) }
+		::logging::annoying_workaround()
     })
 )
 

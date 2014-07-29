@@ -1,8 +1,6 @@
 use core::prelude::*;
 use Cheat;
 use GamePointers;
-use core;
-use libc;
 
 use sdk;
 use sdk::Entity;

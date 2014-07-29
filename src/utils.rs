@@ -1,7 +1,5 @@
 use core::prelude::*;
 use libc;
-use sdk;
-use core;
 
 pub unsafe fn search_memory(start: *const (), len: uint, pattern: &[u8]) -> Option<*const ()> {
 	// BE WARY OF INT OVERFLOW

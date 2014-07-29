@@ -6,7 +6,7 @@ static VMT_MAX_SIZE_YOLO: u32 = 512; // swag
 type VMT = [*const (), ..VMT_MAX_SIZE_YOLO];
 
 pub struct VMTHooker { // this should be renamed.......
-	original_vmt_ptr_ptr: *const VMT,
+	_original_vmt_ptr_ptr: *const VMT,
 	original_vmt: VMT,
 	patched_vmt_ptr: *mut VMT,
 }
@@ -27,7 +27,7 @@ impl VMTHooker {
 		*new_vmt = *vmt_ptr;
 		
 		let hooker = VMTHooker {
-			original_vmt_ptr_ptr: core::mem::transmute(vmt_ptr_ptr),
+			_original_vmt_ptr_ptr: core::mem::transmute(vmt_ptr_ptr),
 			original_vmt: *vmt_ptr,
 			patched_vmt_ptr: new_vmt
 		};

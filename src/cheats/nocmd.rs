@@ -1,5 +1,4 @@
-use {Cheat, GamePointers};
-use sdk;
+use {Cheat};
 
 pub struct NoCmd;
 

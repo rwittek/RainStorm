@@ -1,6 +1,5 @@
 use super::raw;
 use super::{Vector, IVModelInfo, TFClass};
-use core::option::*;
 use core;
 use core::num::FromPrimitive;
 
