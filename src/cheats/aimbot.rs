@@ -17,6 +17,8 @@ pub enum AimbotTargetType {
 	/* poot */ Dispenser, /* here */
 	MVMTank,
 }
+
+/// Given an entity, determine what type of aimbot target it is.
 fn get_target_type<EntType: Entity>(ptrs: &GamePointers, ent: EntType) -> Option<AimbotTargetType> {
 	let classname = ent.get_classname();
 	
@@ -35,17 +37,17 @@ pub struct Aimbot {
 	hitbox: Option<i32>,
 	stop_firing: u8,
 	
+	// Ugly scaling factors that should be improved
 	fovweight: f32,
 	distweight: f32,
-	
-	lastaim: Option<(sdk::Vector, Option<sdk::Vector>)>,
-	predict: bool
 }
 
 impl Aimbot {
+
+	/// Find the best thing to shoot at... if there is one.
+	/// Otherwise, returns None.
 	fn find_target_spot(&mut self, ptrs: &GamePointers, viewangles: &sdk::QAngle) -> Option<sdk::Vector> {
-		let localplayer_entidx = ptrs.ivengineclient.get_local_player();
-		let me: TFPlayer = unsafe { Entity::from_ptr( ptrs.icliententitylist.get_client_entity(localplayer_entidx).unwrap())};
+		let me: TFPlayer = unsafe { Entity::from_ptr( utils::get_local_player_entity(ptrs)) };
 
 		let mut direction = sdk::Vector::new();
 
@@ -182,8 +184,7 @@ impl Aimbot {
 	}
 			
 	fn aim_at_target(&mut self, ptrs: &GamePointers, cmd: &mut sdk::CUserCmd, target: sdk::Vector) {
-		let localplayer_entidx = unsafe {ptrs.ivengineclient.get_local_player()};
-		let me = unsafe {ptrs.icliententitylist.get_client_entity(localplayer_entidx)}.unwrap();
+		let me = utils::get_local_player_entity(ptrs);
 
 		let mut eyes = me.get_origin();
 		

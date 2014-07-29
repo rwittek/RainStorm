@@ -37,8 +37,8 @@ impl Cheat for Crithack {
 			}
 		}
 		 */
-		let localplayer_entidx = ptrs.ivengineclient.get_local_player();
-		let me = ptrs.icliententitylist.get_client_entity(localplayer_entidx).unwrap();
+		let me = utils::get_local_player_entity(ptrs);
+		
 		let wep: sdk::BaseCombatWeapon = unsafe {
 			match ptrs.icliententitylist.get_client_entity_from_handle(*me.ptr_offset::<sdk::CBaseHandle>(0x0DA8)) {
 				Some(wep) => Entity::from_ptr(wep),
@@ -50,6 +50,7 @@ impl Cheat for Crithack {
 		while !sdk::utils::is_commandnum_critical(ptrs, wep, try_cmdnum) {
 			try_cmdnum = try_cmdnum + 1;
 		}
+		
 		cmd.command_number = try_cmdnum;
 		cmd.random_seed = unsafe { sdk::raw::calc_seed_from_command_number(try_cmdnum) };
 	}

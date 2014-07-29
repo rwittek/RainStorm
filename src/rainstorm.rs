@@ -199,7 +199,7 @@ pub extern "C" fn rainstorm_command_cb(c_arguments: *const libc::c_char) {
 
 #[no_mangle]
 pub extern "C" fn rainstorm_init(log_fd: libc::c_int, hooked_init_trampoline: *const (), hooked_createmove_trampoline: *const ()) {
-	unsafe { let _ = logging::set_fd(log_fd).ok().unwrap(); }
+	unsafe { let _ = logging::set_fd(log_fd).unwrap(); }
 	log!("Rainstorm starting up!\n");
 
 	cheats::cheatmgr_setup();
@@ -213,7 +213,7 @@ pub extern "C" fn rainstorm_init(log_fd: libc::c_int, hooked_init_trampoline: *c
 		ibaseclientdll_hooker.hook(21, hooked_createmove_trampoline);
 		
 
-		CINPUT_PTR = locate_cinput().unwrap();
+		CINPUT_PTR = locate_cinput().expect("Failed to locate CInput pointer (signature not found)");
 		let mut hooker = vmthook::VMTHooker::new(CINPUT_PTR as *mut *const ());
 		hooker.hook(8, sdk::get_hooked_getusercmd())
 	};

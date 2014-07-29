@@ -105,9 +105,7 @@ impl TFPlayer {
 	}
 	pub fn get_class(&self) -> TFClass {
 		let classnum = unsafe {*(self.ptr_offset::<u32>(0x1528))};
-		let class = FromPrimitive::from_u32(classnum).unwrap();
-		//log!("{}, {}\n", class, classnum);
-		class
+		FromPrimitive::from_u32(classnum).expect("Invalid class number?")
 	}
 }
 impl Entity for TFPlayer {

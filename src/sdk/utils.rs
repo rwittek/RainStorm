@@ -5,13 +5,14 @@ use super::{get_tracefilter, IVEngineClient, IClientEntityList, IEngineTrace, tr
 use sdk;
 use libc;
 
-pub fn trace_to_entity(ivengineclient: IVEngineClient, icliententitylist: IClientEntityList,
-		ienginetrace: IEngineTrace, viewangles: &QAngle) -> Option<(raw::C_BaseEntityPtr, i32)> {
-	let mut trace = unsafe { trace_t::new() };
-	
+pub fn get_local_player_entity(ptrs: &GamePointers) -> raw::C_BaseEntityPtr {
 	let localplayer_entidx = ivengineclient.get_local_player();
-	let me = icliententitylist.get_client_entity(localplayer_entidx).unwrap();
+	icliententitylist.get_client_entity(localplayer_entidx).expect("Local player entity not found!")
+}
 	
+pub fn trace_to_entity(ptrs: &GamePointers, viewangles: &QAngle) -> Option<(raw::C_BaseEntityPtr, i32)> {
+	let me = get_local_player_entity(ptrs);
+	let mut trace = unsafe { trace_t::new() };
 	//let filter = sdk::create_tracefilter_from_predicate(should_hit_entity);
 
 
@@ -29,7 +30,7 @@ pub fn trace_to_entity(ivengineclient: IVEngineClient, icliententitylist: IClien
 	
 	let ray = Ray_t::new(&eyes, &trace_direction);
 
-	ienginetrace.trace_ray(&ray, 0x4600400B, Some(unsafe { get_tracefilter(me) }), &mut trace);
+	ptrs.ienginetrace.trace_ray(&ray, 0x4600400B, Some(unsafe { get_tracefilter(me) }), &mut trace);
 	
 	if trace.base.allsolid  {
 		None
