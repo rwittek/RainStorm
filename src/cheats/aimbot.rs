@@ -7,6 +7,7 @@ use sdk::Entity;
 use sdk::TFPlayer;
 use sdk::BaseObject;
 use sdk::OnTeam;
+use sdk::{Scout, Soldier, Pyro, Demoman, Heavy, Engineer, Medic, Sniper, Spy, TFClass};
 
 #[deriving(Show)]
 pub enum AimbotTargetType {
@@ -35,7 +36,10 @@ pub struct Aimbot {
 	stop_firing: u8,
 	
 	fovweight: f32,
-	distweight: f32
+	distweight: f32,
+	
+	lastaim: Option<(sdk::Vector, Option<sdk::Vector>)>,
+	predict: bool
 }
 
 impl Aimbot {
@@ -54,7 +58,7 @@ impl Aimbot {
 			eyes.z += (eye_offsets)[2];
 		}
 		let mut max_priority = core::f32::MIN_VALUE; // this is signed
-		let mut best_targ: Option<(i32, sdk::Vector)> = None;
+		let mut best_targ: Option<(sdk::raw::C_BaseEntityPtr, sdk::Vector)> = None;
 		let mut ivengineclient = ptrs.ivengineclient;
 		let mut icliententitylist = ptrs.icliententitylist;
 		let mut ienginetrace = ptrs.ienginetrace;
@@ -82,21 +86,37 @@ impl Aimbot {
 						return
 					}
 				}
-				
+
+				let dist = aimvec.length(); // farther away = worse target
+				//log!("Aimvec distance: {}\n", dist);
+				let fovpriority = self.fovweight * (1.0 + aimvec.norm().dotproduct(&current_aim_norm)); // closer to current crosshair position = better target
+				let distpriority = -1.0 * self.distweight * dist;
 				let targtypepriority = match targtype {
-					Player => 0.0,
-					Dispenser | Teleporter => -500.0,
-					Sentry => 1024.0, // sentries have 1024HU range
+					Player => {
+						let player: TFPlayer = unsafe { Entity::from_ptr(ent.get_ptr()) };
+						match player.get_class() {
+							Scout => if dist < 1000.0 { 100.0 } else { -1000.0 }, // scouts are only really dangerous up close
+							Soldier => 0.0,
+							Pyro => if dist < 500.0 { 1000.0 } else { -1000.0 },
+							Demoman => 0.0,
+							Heavy => if dist < 2000.0 { 10000.0 } else { -1000.0 },
+							Engineer => -200.0, // engineers aren't really a threat
+							Medic => 400.0, // kill meds first
+							Sniper => 3000.0 + dist, // snipers are scary even from far away; ignore distance
+							Spy => if dist < 300.0 { 10000.0 } else { -1000.0 }, // backstab THIS
+						}
+					},
+					Dispenser | Teleporter => -5000.0,
+					Sentry => if dist <= 1500.0 { 10000.0 } else { -5000.0 }, // sentries have 1024HU range
 					MVMTank => 0.0, // I don't play enough MVM to know what to put here
 				};
-				let distpriority = -1.0 * self.distweight * (aimvec).length(); // farther away = worse target
-				let fovpriority = self.fovweight * aimvec.norm().dotproduct(&current_aim_norm); // closer to current crosshair position = better target
+
 				let priority = targtypepriority + distpriority + fovpriority;
-				//log!("priority: {} from {}, {}\n", priority, distpriority, fovpriority);
+				//log!("priority: {} from {}, {}, {}\n", priority, distpriority, fovpriority, targtypepriority);
 				if priority > max_priority {
-					//log!("target: {}, {}, {}", unsafe {(*ptr).get_index()}, pos, dist);
+					//log!("target: {}\n", unsafe {ent.get_index()});
 					max_priority = priority;
-					best_targ = Some((ent.get_index(), pos));
+					best_targ = Some((ent.get_ptr(), pos));
 				}
 			};
 			
@@ -151,14 +171,19 @@ impl Aimbot {
 			}
 		}
 		
-		best_targ.map(|(entidx, pos)| pos)
+		best_targ.map(|(ent, pos)| {
+			pos
+		})
+		
+		/*+ {
+				(ent.get_velocity() - me.get_velocity()).scale(unsafe { sdk::raw::get_current_latency(ptrs.ivengineclient.get_ptr()) })
+			}
+		})*/
 	}
 			
-	fn aim_at_target(&self, ptrs: &GamePointers, cmd: &mut sdk::CUserCmd, target: sdk::Vector) {
+	fn aim_at_target(&mut self, ptrs: &GamePointers, cmd: &mut sdk::CUserCmd, target: sdk::Vector) {
 		let localplayer_entidx = unsafe {ptrs.ivengineclient.get_local_player()};
 		let me = unsafe {ptrs.icliententitylist.get_client_entity(localplayer_entidx)}.unwrap();
-		
-		
 
 		let mut eyes = me.get_origin();
 		
@@ -169,7 +194,11 @@ impl Aimbot {
 			eyes.z += (eye_offsets)[2];
 		}
 		let aimvec = target - eyes;
-
+		
+		//let predicted = aimvec + delta_p.scale(unsafe { 
+		//
+		//} * 1000.0 / 66.0);
+	
 		cmd.viewangles = aimvec.to_angle();
 		
 	}
@@ -184,7 +213,10 @@ impl Cheat for Aimbot {
 			
 			// these values are not remotely on the same scale
 			fovweight: 500.0,
-			distweight: 1.0
+			distweight: 1.0,
+			
+			predict: true,
+			lastaim: None
 		}
 	}
 	fn get_name<'a>(&'a self) -> &'a str {
@@ -227,6 +259,10 @@ impl Cheat for Aimbot {
 			"stop_firing" => {
 				self.stop_firing = ::utils::str_to_integral(val[0]);
 				log!("Stop firing: {}\n", self.stop_firing);
+			}
+			"predict" => {
+				self.predict = ::utils::str_to_integral::<u32>(val[0]) != 0;
+				log!("Prediction: {}\n", self.predict);
 			}
 			"distweight" => {
 				self.distweight = ::utils::str_to_integral::<u32>(val[0]) as f32;

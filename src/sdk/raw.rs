@@ -84,7 +84,7 @@ extern "C" {
 	pub fn c_baseentity_worldspacecenter(ent: C_BaseEntityPtr) -> Vector;
 	pub fn c_baseentity_getindex(ent: C_BaseEntityPtr) -> libc::c_int;
 	pub fn c_baseentity_getclassname(ent: C_BaseEntityPtr) -> *const libc::c_char;
-	
+	pub fn c_baseentity_getvelocity(ent: C_BaseEntityPtr) -> Vector;
 	pub fn getptr_ivmodelinfo() -> IVModelInfoPtr;
 	
 	pub fn c_baseanimating_gethitboxposition(ent: C_BaseEntityPtr, modelinfo: IVModelInfoPtr, hitbox: libc::c_int,

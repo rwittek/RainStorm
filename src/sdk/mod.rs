@@ -120,6 +120,19 @@ pub fn get_ivmodelinfo() -> IVModelInfo {
 pub fn get_tracefilter<EntType: Entity>(me: EntType) -> ITraceFilter {
 	unsafe { ITraceFilter::from_ptr(raw::get_tracefilter(me.get_ptr())) }
 }
+#[deriving(FromPrimitive, Show)]
+pub enum TFClass {
+	Scout = 1,
+	Soldier,
+	Pyro,
+	Demoman,
+	Heavy,
+	Engineer,
+	Medic,
+	Sniper = 9,
+	Spy = 8, // lol wtf
+	// Bread
+}
 pub static IN_ATTACK: i32 = (1 << 0);
 pub static IN_JUMP: i32 = (1 << 1);
 pub static IN_DUCK: i32 = (1 << 2);

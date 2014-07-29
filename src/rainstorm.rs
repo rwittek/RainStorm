@@ -23,6 +23,8 @@ mod cheats;
 
 mod std {
 	pub use core::fmt; //lol
+	pub use core::option;
+	pub use core::num;
 }
 
 #[allow(dead_code)]
@@ -65,6 +67,8 @@ pub mod cmath {
         pub fn lgammaf_r(n: c_float, sign: &mut c_int) -> c_float;*/
     }
 }
+#[no_mangle]
+pub static mut NOCMD_ENABLED: bool = false;
 
 #[no_mangle]
 pub static mut REAL_INIT: *const () = 0 as *const();
@@ -167,6 +171,9 @@ pub unsafe extern "C" fn rainstorm_postinithook() {
 
 #[no_mangle]
 pub unsafe extern "C" fn rainstorm_process_usercmd(cmd: &mut sdk::CUserCmd) {
+	unsafe {
+		maybe_hook_inetchannel((*cheats::CHEAT_MANAGER).get_gamepointers());
+	};
 	if cheats::CHEAT_MANAGER.is_not_null() {
 		(*cheats::CHEAT_MANAGER).process_usercmd(cmd);
 	} else {
@@ -180,7 +187,7 @@ pub extern "C" fn rainstorm_command_cb(c_arguments: *const libc::c_char) {
 	log!("Command callback: {}\n", arguments_str);
 	
 	let mut parts_iter = arguments_str.split(' ');
-	let command = parts_iter.next().unwrap();
+	let command = parts_iter.next().expect("No command type specified!");
 	let parts: collections::Vec<&str> = parts_iter.collect();
 	
 	unsafe {
@@ -204,23 +211,45 @@ pub extern "C" fn rainstorm_init(log_fd: libc::c_int, hooked_init_trampoline: *c
 		
 		ibaseclientdll_hooker.hook(0, hooked_init_trampoline);
 		ibaseclientdll_hooker.hook(21, hooked_createmove_trampoline);
-	};
-	
+		
 
-	unsafe {
 		CINPUT_PTR = locate_cinput().unwrap();
 		let mut hooker = vmthook::VMTHooker::new(CINPUT_PTR as *mut *const ());
 		hooker.hook(8, sdk::get_hooked_getusercmd())
 	};
 }
 
+/// If we haven't seen this INetChannel before, hook it.
+fn maybe_hook_inetchannel(ptrs: &GamePointers) {
+ 	static mut LAST_NETCHANNEL: Option<sdk::raw::INetChannelPtr> = None;
+ 	
+ 	unsafe {
+ 		let mut inetchannel = sdk::raw::get_current_inetchannel(ptrs.ivengineclient.get_ptr());
+		//log!("chan: {}\n", inetchannel.to_uint());
+ 		let is_new_channel = match LAST_NETCHANNEL {
+ 			Some(last) => { inetchannel != last },
+ 			None => true
+ 		};
+ 		LAST_NETCHANNEL = Some(inetchannel);
+ 		
+ 		if !is_new_channel {
+ 			//log!("Not patching old netchannel");
+ 			return;
+ 		}
+ 		
+ 		let mut hooker = vmthook::VMTHooker::new(inetchannel.to_uint() as *mut *const ());
+ 		REAL_NETCHANNEL_SENDNETMSG = hooker.get_orig_method(40);
+ 		hooker.hook(40, ::sdk::raw::get_netchannel_sendnetmsg_trampoline().to_uint() as *const ());
+ 		
+ 	};
+ }
 #[lang = "stack_exhausted"] extern fn stack_exhausted() {}
 #[lang = "eh_personality"] extern fn eh_personality() {}
 
 #[lang = "begin_unwind"]
 extern fn begin_unwind(fmt: &core::fmt::Arguments, file: &str, line: uint) -> ! {
 	log!("Failed at line {} of {}!\n", line, file);
-	let _ = logging::log_fmt(fmt).ok().unwrap();
+	let _ = logging::log_fmt(fmt).unwrap();
 	unsafe { libc::exit(42); }
 }
 

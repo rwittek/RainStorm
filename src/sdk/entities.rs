@@ -1,6 +1,8 @@
 use super::raw;
-use super::{Vector, IVModelInfo};
+use super::{Vector, IVModelInfo, TFClass};
+use core::option::*;
 use core;
+use core::num::FromPrimitive;
 
 pub trait Entity: core::kinds::Copy {
 	unsafe fn from_ptr(ptr: raw::C_BaseEntityPtr) -> Self;
@@ -11,6 +13,9 @@ pub trait Entity: core::kinds::Copy {
 	}
 	fn worldspacecenter(&self) -> Vector {
 		unsafe { raw::c_baseentity_worldspacecenter(self.get_ptr()) }
+	}
+	fn get_velocity(&self) -> Vector {
+		unsafe { raw::c_baseentity_getvelocity(self.get_ptr()) }
 	}
 	fn get_index(&self) -> i32 {
 		unsafe { raw::c_baseentity_getindex(self.get_ptr()) }
@@ -98,8 +103,11 @@ impl TFPlayer {
 	pub fn get_life_state(&self) -> i8 {
 		unsafe { *(self.ptr_offset::<i8>(0x00A1)) }
 	}
-	pub fn get_class(&self) -> u32 {
-		unsafe {*(self.ptr_offset(0x1524))}
+	pub fn get_class(&self) -> TFClass {
+		let classnum = unsafe {*(self.ptr_offset::<u32>(0x1528))};
+		let class = FromPrimitive::from_u32(classnum).unwrap();
+		//log!("{}, {}\n", class, classnum);
+		class
 	}
 }
 impl Entity for TFPlayer {

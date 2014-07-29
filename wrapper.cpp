@@ -488,10 +488,11 @@ ConCommand rainstorm_command("rainstorm", rainstorm_command_cb_trampoline);
 
 
 extern "C" CInput *CINPUT_PTR;
+extern "C" bool NOCMD_ENABLED;
 IClientEntityList *ENTLISTPTR;
 extern "C" int ( __stdcall *REAL_INIT)( CreateInterfaceFn appSysFactory, CreateInterfaceFn physicsFactory, CGlobalVarsBase* pGlobals );
 extern "C" void (__stdcall *REAL_CREATEMOVE)( int sequence_number, float input_sample_frametime, bool active );
-extern "C" bool (__stdcall *REAL_NETCHANNEL_SENDNETMSG)(INetMessage *msg, bool bForceReliable, bool bVoice);
+extern "C" bool (__fastcall *REAL_NETCHANNEL_SENDNETMSG)(INetChannel *chan, int ignoreme, INetMessage *msg, bool bForceReliable, bool bVoice);
 extern "C" void rainstorm_preinithook( CreateInterfaceFn appSysFactory, CreateInterfaceFn physicsFactory, CGlobalVarsBase* pGlobals );
 extern "C" void rainstorm_postinithook();
 extern "C" void rainstorm_process_usercmd(CUserCmd *cmd);
@@ -529,18 +530,18 @@ void __stdcall hooked_createmove_trampoline( int sequence_number, float input_sa
 	pSafeCommand->m_cmd = *pCommand;
 	pSafeCommand->m_crc = pSafeCommand->m_cmd.GetChecksum();
 }
+extern "C" Vector c_baseentity_getvelocity(C_BaseEntity *ent) {
+	return ent->GetBaseVelocity() + ent->GetLocalVelocity();
+}
 
-bool __stdcall hooked_netchannel_sendnetmsg_trampoline(INetMessage *msg, bool bForceReliable, bool bVoice) {
-	// INetChannel *thisptr, 
-	//rainstorm_sendnetmsg(msg, bForceReliable, bVoice);qboolean
-	__asm {
-		nop
-		nop
-		nop
+bool __fastcall hooked_netchannel_sendnetmsg_trampoline(INetChannel *chan, int ignoreme, INetMessage *msg, bool bForceReliable, bool bVoice) {
+	
+	if (NOCMD_ENABLED) {
+		chan->SetChoked();
+		return REAL_NETCHANNEL_SENDNETMSG(chan, ignoreme, msg, bForceReliable, bVoice);
+	} else {
+		return REAL_NETCHANNEL_SENDNETMSG(chan, ignoreme, msg, bForceReliable, bVoice);
 	}
-	(*REAL_NETCHANNEL_SENDNETMSG)(msg, bForceReliable, bVoice);
-	fprintf(logfile, "meow meow, %p\n", REAL_NETCHANNEL_SENDNETMSG);
-	return false;
 }
 
 CUserCmd* __stdcall Hooked_GetUserCmd( int sequence_number ) 
