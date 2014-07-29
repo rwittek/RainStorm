@@ -123,8 +123,8 @@ pub fn get_tracefilter<EntType: Entity>(me: EntType) -> ITraceFilter {
 #[deriving(FromPrimitive, Show)]
 pub enum TFClass {
 	Scout = 1,
-	Soldier,
 	Sniper,
+	Soldier,
 	Demoman,
 	Medic,
 	Heavy,
