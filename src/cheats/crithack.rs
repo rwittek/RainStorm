@@ -24,16 +24,7 @@ impl Cheat for Crithack {
 		if cmd.buttons & sdk::IN_ATTACK == 0 {
 			return;
 		}
-		// EXPERIMENTAL
-/* 		if !self.ismelee {
-			self.ctr += 1;
-			if self.ctr > 2 {
-				self.ctr = 0;
-			} else {
-				return;
-			}
-		}
-		 */
+		
 		let me = utils::get_local_player_entity(ptrs);
 		
 		let wep: sdk::BaseCombatWeapon = unsafe {

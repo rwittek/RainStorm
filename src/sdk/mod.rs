@@ -124,13 +124,13 @@ pub fn get_tracefilter<EntType: Entity>(me: EntType) -> ITraceFilter {
 pub enum TFClass {
 	Scout = 1,
 	Soldier,
-	Pyro,
+	Sniper,
 	Demoman,
-	Heavy,
-	Engineer,
 	Medic,
-	Sniper = 9,
-	Spy = 8, // lol wtf
+	Heavy,
+	Pyro,
+	Spy,
+	Engineer, // lol wtf
 	// Bread
 }
 pub static IN_ATTACK: i32 = (1 << 0);
@@ -283,6 +283,11 @@ impl IBaseClientDLL {
 	}
 	pub unsafe fn from_ptr(ptr: raw::IBaseClientDLLPtr) -> IBaseClientDLL {
 		IBaseClientDLL { ptr: ptr }
+	}
+	pub fn set_crosshair_angles(self, angles: &QAngle) {
+		unsafe {
+			raw::ibaseclientdll_setcrosshairangles(self.get_ptr(), angles)
+		}
 	}
 }
 impl IUniformRandomStream {

@@ -75,7 +75,7 @@ pub static mut REAL_INIT: *const () = 0 as *const();
 #[no_mangle]
 pub static mut REAL_CREATEMOVE: *const () = 0 as *const ();
 #[no_mangle]
-pub static mut REAL_NETCHANNEL_SENDNETMSG: *const () = 0 as *const ();
+pub static mut REAL_NETCHANNEL_SENDDATAGRAM: *const () = 0 as *const ();
 #[no_mangle]
 pub static mut CINPUT_PTR: *mut sdk::CInput = 0 as *mut sdk::CInput;
 
@@ -170,15 +170,25 @@ pub unsafe extern "C" fn rainstorm_postinithook() {
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn rainstorm_process_usercmd(cmd: &mut sdk::CUserCmd) {
+pub unsafe extern "C" fn rainstorm_pre_createmove(sequence_number: *mut libc::c_int, input_sample_frametime: *mut libc::c_float, active: *mut bool) {
 	if cheats::CHEAT_MANAGER.is_not_null() {
-		maybe_hook_inetchannel((*cheats::CHEAT_MANAGER).get_gamepointers());
-		(*cheats::CHEAT_MANAGER).process_usercmd(cmd);
+		//maybe_hook_inetchannel((*cheats::CHEAT_MANAGER).get_gamepointers());
+		(*cheats::CHEAT_MANAGER).pre_createmove(sequence_number, input_sample_frametime, active);
 	} else {
-		log!("Cheat manager not found!\n");
-		libc::exit(1);
+		quit!("Cheat manager not found!\n");
 	};
 }
+
+#[no_mangle]
+pub unsafe extern "C" fn rainstorm_process_usercmd(cmd: &mut sdk::CUserCmd) {
+	if cheats::CHEAT_MANAGER.is_not_null() {
+		//maybe_hook_inetchannel((*cheats::CHEAT_MANAGER).get_gamepointers());
+		(*cheats::CHEAT_MANAGER).process_usercmd(cmd);
+	} else {
+		quit!("Cheat manager not found!\n");
+	};
+}
+
 #[no_mangle]
 pub extern "C" fn rainstorm_command_cb(c_arguments: *const libc::c_char) {
 	let arguments_str = unsafe { core::str::raw::c_str_to_static_slice(c_arguments) };
@@ -217,6 +227,7 @@ pub extern "C" fn rainstorm_init(log_fd: libc::c_int, hooked_init_trampoline: *c
 	};
 }
 
+/*
 /// If we haven't seen this INetChannel before, hook it.
 fn maybe_hook_inetchannel(ptrs: &GamePointers) {
  	static mut LAST_NETCHANNEL: Option<sdk::raw::INetChannelPtr> = None;
@@ -236,11 +247,12 @@ fn maybe_hook_inetchannel(ptrs: &GamePointers) {
  		}
  		
  		let mut hooker = vmthook::VMTHooker::new(inetchannel.to_uint() as *mut *const ());
- 		REAL_NETCHANNEL_SENDNETMSG = hooker.get_orig_method(40);
- 		hooker.hook(40, ::sdk::raw::get_netchannel_sendnetmsg_trampoline().to_uint() as *const ());
- 		
+ 		REAL_NETCHANNEL_SENDDATAGRAM =  hooker.get_orig_method(46);
+ 		hooker.hook(46, ::sdk::raw::get_netchannel_senddatagram_trampoline().to_uint() as *const ());
+ 		log!("senddatagram: {}\n", hooker.get_orig_method(46));
+		
  	};
- }
+ }*/
 #[lang = "stack_exhausted"] extern fn stack_exhausted() {}
 #[lang = "eh_personality"] extern fn eh_personality() {}
 

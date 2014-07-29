@@ -191,7 +191,7 @@ impl Aimbot {
 		let aimvec = target - eyes;
 		
 		cmd.viewangles = aimvec.to_angle();
-		
+		ptrs.ibaseclientdll.set_crosshair_angles(&cmd.viewangles);
 	}
 }
 

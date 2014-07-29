@@ -5,6 +5,7 @@ use core::prelude::*;
 use alloc;
 use core;
 use GamePointers;
+use libc;
 
 pub mod triggerbot;
 pub mod cvarunlocker;
@@ -14,6 +15,7 @@ pub mod nocmd;
 pub mod nospread;
 pub mod crithack;
 pub mod bhop;
+pub mod condremover;
 
 pub static mut CHEAT_MANAGER: *mut CheatManager = 0 as *mut CheatManager;
 
@@ -36,6 +38,10 @@ pub trait Cheat {
 	fn preinit(&mut self, ptrs: &GamePointers) {}
 	#[allow(unused_variable)]
 	fn postinit(&mut self, ptrs: &GamePointers) {}
+	#[allow(unused_variable)]
+	fn pre_createmove(&mut self, ptrs: &GamePointers, sequence_number: *mut libc::c_int,
+			input_sample_frametime: *mut libc::c_float, active: *mut bool) {}
+			
 	#[allow(unused_variable)]
 	fn process_usercmd(&mut self, ptrs: &GamePointers, &mut sdk::CUserCmd) {}
 	
@@ -67,7 +73,7 @@ impl CheatManager {
 		let nospread: Box<nospread::NoSpread> = box Cheat::new();
 		let crithack: Box<crithack::Crithack> = box Cheat::new();
 		let bhop: Box<bhop::Bunnyhop> = box Cheat::new();
-		
+		let condremover: Box<condremover::CondRemover> = box Cheat::new();
 		log!("Creating CheatManager...\n");
 		let mut mgr = CheatManager { 
 			cheats: Vec::new(),
@@ -84,6 +90,7 @@ impl CheatManager {
 		mgr.cheats.push(namechanger);
 		mgr.cheats.push(nocmd);
 		mgr.cheats.push(bhop);
+		mgr.cheats.push(condremover);
 		mgr
 	}
 	pub fn handle_command(&mut self, command: &str, arguments: &[&str]) {
@@ -129,6 +136,12 @@ impl CheatManager {
 	pub fn postinit(&mut self) {
 		for cheat in self.cheats.mut_iter() {
 			cheat.postinit(&self.ptrs);
+		}
+	}
+	pub fn pre_createmove(&mut self, sequence_number: *mut libc::c_int,
+			input_sample_frametime: *mut libc::c_float, active: *mut bool) {
+		for cheat in self.cheats.mut_iter() {
+			cheat.pre_createmove(&self.ptrs, sequence_number, input_sample_frametime, active);
 		}
 	}
 	pub fn process_usercmd(&mut self, cmd: &mut sdk::CUserCmd) {

@@ -492,9 +492,10 @@ extern "C" bool NOCMD_ENABLED;
 IClientEntityList *ENTLISTPTR;
 extern "C" int ( __stdcall *REAL_INIT)( CreateInterfaceFn appSysFactory, CreateInterfaceFn physicsFactory, CGlobalVarsBase* pGlobals );
 extern "C" void (__stdcall *REAL_CREATEMOVE)( int sequence_number, float input_sample_frametime, bool active );
-extern "C" bool (__fastcall *REAL_NETCHANNEL_SENDNETMSG)(INetChannel *chan, int ignoreme, INetMessage *msg, bool bForceReliable, bool bVoice);
+extern "C" bool (__fastcall *REAL_NETCHANNEL_SENDDATAGRAM)(INetChannel *chan, int ignoreme, bf_write *data);
 extern "C" void rainstorm_preinithook( CreateInterfaceFn appSysFactory, CreateInterfaceFn physicsFactory, CGlobalVarsBase* pGlobals );
 extern "C" void rainstorm_postinithook();
+extern "C" void rainstorm_pre_createmove(int *sequence_number_ptr, float *input_sample_frametime_ptr, bool *active_ptr);
 extern "C" void rainstorm_process_usercmd(CUserCmd *cmd);
 extern "C" IVEngineClient *rainstorm_getivengineclient();
 extern "C" void rainstorm_init(int log_fd, void * hooked_init_trampoline, void *hooked_createmove_trampoline);
@@ -514,6 +515,8 @@ int __stdcall hooked_init_trampoline( CreateInterfaceFn appSysFactory, CreateInt
 
 void __stdcall hooked_createmove_trampoline( int sequence_number, float input_sample_frametime, bool active )
 {
+	rainstorm_pre_createmove(&sequence_number, &input_sample_frametime, &active);
+	
 	(*REAL_CREATEMOVE)( sequence_number, input_sample_frametime, active );
 	IVEngineClient *engine = rainstorm_getivengineclient();
 	
@@ -526,6 +529,7 @@ void __stdcall hooked_createmove_trampoline( int sequence_number, float input_sa
 	
 	
 	rainstorm_process_usercmd(pCommand);
+	
 	CVerifiedUserCmd *pSafeCommand = *reinterpret_cast<CVerifiedUserCmd**>((size_t)CINPUT_PTR + 0xC8) + (sequence_number%90);
 	pSafeCommand->m_cmd = *pCommand;
 	pSafeCommand->m_crc = pSafeCommand->m_cmd.GetChecksum();
@@ -534,13 +538,12 @@ extern "C" Vector c_baseentity_getvelocity(C_BaseEntity *ent) {
 	return ent->GetBaseVelocity() + ent->GetLocalVelocity();
 }
 
-bool __fastcall hooked_netchannel_sendnetmsg_trampoline(INetChannel *chan, int ignoreme, INetMessage *msg, bool bForceReliable, bool bVoice) {
+bool __fastcall hooked_netchannel_senddatagram_trampoline(INetChannel *chan, int ignoreme, bf_write *data) {
 	
 	if (NOCMD_ENABLED) {
-		chan->SetChoked();
-		return REAL_NETCHANNEL_SENDNETMSG(chan, ignoreme, msg, bForceReliable, bVoice);
+		return REAL_NETCHANNEL_SENDDATAGRAM(chan, ignoreme, data);
 	} else {
-		return REAL_NETCHANNEL_SENDNETMSG(chan, ignoreme, msg, bForceReliable, bVoice);
+		return REAL_NETCHANNEL_SENDDATAGRAM(chan, ignoreme, data);
 	}
 }
 
@@ -553,8 +556,8 @@ extern "C" void *get_hooked_getusercmd() {
 	return &Hooked_GetUserCmd;
 }
 
-extern "C" void *get_netchannel_sendnetmsg_trampoline() {
-	return &hooked_netchannel_sendnetmsg_trampoline;
+extern "C" void *get_netchannel_senddatagram_trampoline() {
+	return &hooked_netchannel_senddatagram_trampoline;
 }
 
 
@@ -806,6 +809,9 @@ extern "C" int c_baseanimating_getnumhitboxes(C_BaseAnimating *ent, IVModelInfo 
 }
 extern "C" void ivengineclient_setviewangles(IVEngineClient *eng, QAngle &ang) {
 	eng->SetViewAngles(ang);
+}
+extern "C" void ibaseclientdll_setcrosshairangles(IBaseClientDLL *client, QAngle &ang) {
+	client->SetCrosshairAngle(ang);
 }
 extern "C" size_t ivengineclient_getplayername(IVEngineClient *eng, C_BaseEntity *ent, char *buf, size_t bufsize) {
 	player_info_t info;

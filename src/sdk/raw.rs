@@ -63,6 +63,7 @@ extern "C" {
 	pub fn ivengineclient_getlocalplayer(engine: IVEngineClientPtr) -> libc::c_int;
 	pub fn ivengineclient_getplayername(engine: IVEngineClientPtr, ent: C_BaseEntityPtr, buf: *mut u8, bufsize: libc::size_t) -> libc::size_t;
 	pub fn ivengineclient_setviewangles(engine: IVEngineClientPtr, angles: &QAngle);
+	pub fn ibaseclientdll_setcrosshairangles(engine: IBaseClientDLLPtr, angles: &QAngle);
 
 	pub fn getptr_ienginetrace() -> IEngineTracePtr; // MAYBE NULL
 	pub fn ienginetrace_traceray(enginetrace: IEngineTracePtr, ray: &Ray_t, mask: u32, filter: ITraceFilterPtr, trace: &mut trace_t);
@@ -110,7 +111,7 @@ extern "C" {
 	
 	pub fn get_current_inetchannel(engine: IVEngineClientPtr) -> INetChannelPtr;
 	pub fn get_current_latency(engine: IVEngineClientPtr) -> libc::c_float;
-	pub fn get_netchannel_sendnetmsg_trampoline() -> *const ();
+	pub fn get_netchannel_senddatagram_trampoline() -> *const ();
 	pub fn get_hooked_getusercmd() -> *const ();
 	pub fn ismousedown() -> bool;
 	pub fn get_critbucket_contents(ent: C_BaseEntityPtr) -> libc::c_float;
