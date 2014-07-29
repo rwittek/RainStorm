@@ -16,6 +16,8 @@ macro_rules! log(
     })
 )
 
+
+
 macro_rules! quit(
 	($($arg:tt)*) => ({
 		log!($($arg)*);

@@ -1,9 +1,11 @@
+use core::prelude::*;
 use Cheat;
 use GamePointers;
-use sdk;
-use libc;
-use core::prelude::*;
 use core;
+use libc;
+
+use sdk;
+use sdk::Entity;
 
 pub struct Triggerbot {
 	enabled: bool,
@@ -24,22 +26,22 @@ impl Cheat for Triggerbot {
 			return;
 		}
 		
-		let mut ivengineclient = ptrs.ivengineclient;
-		let mut icliententitylist = ptrs.icliententitylist;
-		let mut ienginetrace = ptrs.ienginetrace;
 		// button 1 = IN_ATTACK
 		if cmd.buttons & 1 == 1 {
 			cmd.buttons = !((!cmd.buttons) | 1); // zero the IN_ATTACK bit
-			
-			// FIXME
-			if false { //::utils::should_shoot(ivengineclient, icliententitylist, ienginetrace, &cmd.viewangles, None) {
-				self.smoothing_state = self.smoothing_state + 1;
-				if self.smoothing_state > self.smoothing {
-					cmd.buttons = cmd.buttons | 1; // set IN_ATTACK
-				}
-			} else {
-				if self.smoothing_state > 0 {
-					self.smoothing_state = self.smoothing_state - 1;
+
+			let trace = sdk::utils::trace_to_entity(ptrs, &cmd.viewangles);
+			match trace {
+				Some((ent, hitbox)) if ent.get_classname() == "CTFPlayer" && hitbox == 0 => { // player in the head
+					self.smoothing_state += 1;
+					if self.smoothing_state > self.smoothing {
+						cmd.buttons = cmd.buttons | 1; // set IN_ATTACK
+					}
+				},
+				_ => {
+					if self.smoothing_state > 0 {
+						self.smoothing_state -= 1;
+					}
 				}
 			}
 		}

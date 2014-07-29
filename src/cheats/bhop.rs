@@ -1,9 +1,6 @@
 use Cheat;
 use GamePointers;
 use sdk;
-use libc;
-use core::prelude::*;
-use core;
 use sdk::Entity;
 
 pub struct Bunnyhop {

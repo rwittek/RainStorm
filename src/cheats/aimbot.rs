@@ -1,13 +1,14 @@
 use {Cheat, GamePointers};
-use sdk;
 use core;
 use core::prelude::*;
+use sdk;
 use sdk::Animating;
 use sdk::Entity;
 use sdk::TFPlayer;
 use sdk::BaseObject;
 use sdk::OnTeam;
 use sdk::{Scout, Soldier, Pyro, Demoman, Heavy, Engineer, Medic, Sniper, Spy, TFClass};
+use sdk::utils;
 
 #[deriving(Show)]
 pub enum AimbotTargetType {
@@ -73,7 +74,7 @@ impl Aimbot {
 				let mut tempangles = aimvec.to_angle();
 				
 				// can we actually see this?
-				match sdk::utils::trace_to_entity(ivengineclient, icliententitylist, ienginetrace, &tempangles) {
+				match sdk::utils::trace_to_entity(ptrs, &tempangles) {
 					Some((trace_ent, hit_hitbox)) if trace_ent == ent.get_ptr() => {
 						match hitbox {
 							Some(hb) => {
@@ -196,10 +197,6 @@ impl Aimbot {
 		}
 		let aimvec = target - eyes;
 		
-		//let predicted = aimvec + delta_p.scale(unsafe { 
-		//
-		//} * 1000.0 / 66.0);
-	
 		cmd.viewangles = aimvec.to_angle();
 		
 	}
@@ -215,9 +212,6 @@ impl Cheat for Aimbot {
 			// these values are not remotely on the same scale
 			fovweight: 500.0,
 			distweight: 1.0,
-			
-			predict: true,
-			lastaim: None
 		}
 	}
 	fn get_name<'a>(&'a self) -> &'a str {
@@ -260,10 +254,6 @@ impl Cheat for Aimbot {
 			"stop_firing" => {
 				self.stop_firing = ::utils::str_to_integral(val[0]);
 				log!("Stop firing: {}\n", self.stop_firing);
-			}
-			"predict" => {
-				self.predict = ::utils::str_to_integral::<u32>(val[0]) != 0;
-				log!("Prediction: {}\n", self.predict);
 			}
 			"distweight" => {
 				self.distweight = ::utils::str_to_integral::<u32>(val[0]) as f32;

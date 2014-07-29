@@ -1,21 +1,18 @@
 use Cheat;
 use GamePointers;
 use sdk;
-use libc;
 use core::prelude::*;
-use core;
 use sdk::Entity;
-use sdk::CombatWeapon;
+use sdk::utils;
 
 pub struct Crithack {
 	enabled: bool,
-	ctr: u32,
 }
 
 
 impl Cheat for Crithack {
 	fn new() -> Crithack {
-		Crithack { enabled: false, ctr: 0 }
+		Crithack { enabled: false }
 	}
 	fn get_name<'a>(&'a self) -> &'a str {
 		"Crithack"

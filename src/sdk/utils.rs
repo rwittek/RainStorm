@@ -6,8 +6,8 @@ use sdk;
 use libc;
 
 pub fn get_local_player_entity(ptrs: &GamePointers) -> raw::C_BaseEntityPtr {
-	let localplayer_entidx = ivengineclient.get_local_player();
-	icliententitylist.get_client_entity(localplayer_entidx).expect("Local player entity not found!")
+	let localplayer_entidx = ptrs.ivengineclient.get_local_player();
+	ptrs.icliententitylist.get_client_entity(localplayer_entidx).expect("Local player entity not found!")
 }
 	
 pub fn trace_to_entity(ptrs: &GamePointers, viewangles: &QAngle) -> Option<(raw::C_BaseEntityPtr, i32)> {

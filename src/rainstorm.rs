@@ -134,7 +134,7 @@ pub unsafe fn locate_cinput() -> Option<*mut sdk::CInput> {
 	//let result = utils::search_memory(((result1 as uint) + 2) as *const (), 100, &[0x8B, 0x0D]);
 	match result {
 		Some(ptr) => {
-			let load_instruction_operand = (((ptr as uint) + 2) as *const *const *mut sdk::CInput);
+			let load_instruction_operand = ((ptr as uint) + 2) as *const *const *mut sdk::CInput;
 			log!("CInput load found at {}\n", load_instruction_operand); 
 			let cinput_ptr_ptr = *load_instruction_operand;
 			log!("CInput pointer: {}\n", cinput_ptr_ptr);
@@ -171,10 +171,8 @@ pub unsafe extern "C" fn rainstorm_postinithook() {
 
 #[no_mangle]
 pub unsafe extern "C" fn rainstorm_process_usercmd(cmd: &mut sdk::CUserCmd) {
-	unsafe {
-		maybe_hook_inetchannel((*cheats::CHEAT_MANAGER).get_gamepointers());
-	};
 	if cheats::CHEAT_MANAGER.is_not_null() {
+		maybe_hook_inetchannel((*cheats::CHEAT_MANAGER).get_gamepointers());
 		(*cheats::CHEAT_MANAGER).process_usercmd(cmd);
 	} else {
 		log!("Cheat manager not found!\n");
@@ -224,7 +222,7 @@ fn maybe_hook_inetchannel(ptrs: &GamePointers) {
  	static mut LAST_NETCHANNEL: Option<sdk::raw::INetChannelPtr> = None;
  	
  	unsafe {
- 		let mut inetchannel = sdk::raw::get_current_inetchannel(ptrs.ivengineclient.get_ptr());
+ 		let inetchannel = sdk::raw::get_current_inetchannel(ptrs.ivengineclient.get_ptr());
 		//log!("chan: {}\n", inetchannel.to_uint());
  		let is_new_channel = match LAST_NETCHANNEL {
  			Some(last) => { inetchannel != last },
@@ -249,7 +247,7 @@ fn maybe_hook_inetchannel(ptrs: &GamePointers) {
 #[lang = "begin_unwind"]
 extern fn begin_unwind(fmt: &core::fmt::Arguments, file: &str, line: uint) -> ! {
 	log!("Failed at line {} of {}!\n", line, file);
-	let _ = logging::log_fmt(fmt).unwrap();
+	let _ = logging::log_fmt(fmt).ok(); // if we fail here, god help us
 	unsafe { libc::exit(42); }
 }
 
