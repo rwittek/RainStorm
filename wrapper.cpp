@@ -539,7 +539,7 @@ extern "C" Vector c_baseentity_getvelocity(C_BaseEntity *ent) {
 }
 
 bool __fastcall hooked_netchannel_senddatagram_trampoline(INetChannel *chan, int ignoreme, bf_write *data) {
-	
+	*(int *)(( (int) chan ) + 0x1C) = 69; // hue
 	if (NOCMD_ENABLED) {
 		return REAL_NETCHANNEL_SENDDATAGRAM(chan, ignoreme, data);
 	} else {
@@ -668,10 +668,8 @@ extern "C" void convar_setvalue_raw_int(ConVar *cvar, int value) {
 extern "C" void convar_setvalue_str(ConVar *cvar, const char *value) {
 	cvar->SetValue(value);
 }
-extern "C" void convar_clearflags(ConVar *cvar) {
-	cvar->m_nFlags = FCVAR_NONE;
-	cvar->m_bHasMin = false;
-	cvar->m_bHasMax = false;
+extern "C" void concommand_clearflags(ConVar *pVar) {
+	pVar->m_nFlags = FCVAR_NONE;
 }
 extern "C" void _Unwind_Resume() {
 	while (1) {;};
@@ -766,17 +764,31 @@ void get_hitbox_position(C_BaseAnimating *ent, IVModelInfo *modelinfo, int hitbo
 {
 	int bone = -1;
 	studiohdr_t *pStudioHdr = modelinfo->GetStudiomodel(ent->GetModel());
+	Vector bbmax, bbmin;
 	if ( pStudioHdr )
 	{
 		mstudiohitboxset_t *set =pStudioHdr->pHitboxSet( ent->m_nHitboxSet );
 		if ( set && hitboxIndex < set->numhitboxes )
 		{
-			bone = set->pHitbox( hitboxIndex )->bone;
+			auto hitbox = set->pHitbox( hitboxIndex );
+			bbmax = hitbox->bbmax;
+			bbmin = hitbox->bbmin;
+			bone = hitbox->bone;
 		}
 	}
 	if (bone == -1) return;
 	
-	get_bone_position(ent, modelinfo, bone, origin);
+	matrix3x4_t bonetoworld[128];
+
+	if( !ent->SetupBones( bonetoworld, MAXSTUDIOBONES, BONE_USED_BY_HITBOX, 0) )
+        return;
+
+	Vector bbmax_world;
+	Vector bbmin_world;
+	VectorTransform(bbmax, bonetoworld[bone], bbmax_world);
+	VectorTransform(bbmin, bonetoworld[bone], bbmin_world);
+	
+	origin = (bbmax_world + bbmin_world)/2.0;
 }
 
 extern "C" void c_baseanimating_gethitboxposition(C_BaseAnimating *ent, IVModelInfo *modelinfo, int iHitbox, Vector &origin ) {

@@ -1,10 +1,23 @@
 use core::prelude::*;
 use GamePointers;
 use super::{get_tracefilter, IClientEntityList, trace_t, Ray_t, QAngle,
-	Entity, Animating, raw};
+	Entity, Animating, raw, Vector};
 use sdk;
 use libc;
-
+pub fn rotate_movement(movement: (f32, f32, f32), orig_angles: QAngle, new_angles: QAngle) -> (f32, f32, f32) {
+	let (fwd, right, up) = movement;
+	let (orig_fwd, orig_right, orig_up) = orig_angles.to_vectors();
+	let (orig_fwdnorm, orig_rightnorm, orig_upnorm) = (orig_fwd.norm(), orig_right.norm(), orig_up.norm());
+	let (new_fwd, new_right, new_up) = new_angles.to_vectors();
+	
+	(
+		fwd * new_fwd.dotproduct(&orig_fwd) + right * new_fwd.dotproduct(&orig_rightnorm) + up * new_fwd.dotproduct(&orig_upnorm),
+		fwd * new_right.dotproduct(&orig_fwdnorm) + right * new_right.dotproduct(&orig_rightnorm) + up * new_right.dotproduct(&orig_upnorm),
+		fwd * new_up.dotproduct(&orig_fwdnorm) + right * new_up.dotproduct(&orig_rightnorm) + up * new_up.dotproduct(&orig_upnorm)
+	)
+}
+	
+	
 pub fn get_local_player_entity(ptrs: &GamePointers) -> raw::C_BaseEntityPtr {
 	let localplayer_entidx = ptrs.ivengineclient.get_local_player();
 	ptrs.icliententitylist.get_client_entity(localplayer_entidx).expect("Local player entity not found!")

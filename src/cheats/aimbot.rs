@@ -93,15 +93,15 @@ impl Aimbot {
 					Player => {
 						let player: TFPlayer = unsafe { Entity::from_ptr(ent.get_ptr()) };
 						match player.get_class() {
-							Scout => if dist < 1000.0 { 100.0 } else { -1000.0 }, // scouts are only really dangerous up close
+							Scout => 0.0,
 							Soldier => 0.0,
-							Pyro => if dist < 500.0 { 1000.0 } else { -1000.0 },
+							Pyro => if dist < 2000.0 { 1000.0 } else { -1000.0 },
 							Demoman => 0.0,
-							Heavy => if dist < 2000.0 { 10000.0 } else { -1000.0 },
-							Engineer => -200.0, // engineers aren't really a threat
-							Medic => 400.0, // kill meds first
+							Heavy => if dist < 5000.0 { 1000.0 } else { -1000.0 },
+							Engineer => -500.0, // engineers aren't really a threat
+							Medic => 2000.0, // kill meds first
 							Sniper => 3000.0 + dist, // snipers are scary even from far away; ignore distance
-							Spy => if dist < 300.0 { 10000.0 } else { -1000.0 }, // backstab THIS
+							Spy => if dist < 500.0 { 10000.0 } else { -1000.0 }, // backstab THIS
 						}
 					},
 					Dispenser | Teleporter => -5000.0,
@@ -190,8 +190,10 @@ impl Aimbot {
 		}
 		let aimvec = target - eyes;
 		
+		let oldviewangles = cmd.viewangles;
 		cmd.viewangles = aimvec.to_angle();
-		ptrs.ibaseclientdll.set_crosshair_angles(&cmd.viewangles);
+		let (forwardmove, sidemove, upmove) = sdk::utils::rotate_movement((cmd.forwardmove, cmd.sidemove, cmd.upmove), oldviewangles, cmd.viewangles);
+		cmd.forwardmove = forwardmove; cmd.sidemove = sidemove; cmd.upmove = upmove;
 	}
 }
 
@@ -203,7 +205,7 @@ impl Cheat for Aimbot {
 			stop_firing: 1,
 			
 			// these values are not remotely on the same scale
-			fovweight: 500.0,
+			fovweight: 0.0,
 			distweight: 1.0,
 		}
 	}

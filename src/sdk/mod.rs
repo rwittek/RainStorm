@@ -355,6 +355,13 @@ impl QAngle {
 			temp
 		}
 	}
+	pub fn to_vectors(&self) -> (Vector, Vector, Vector) {
+		unsafe {
+			let (mut fwd, mut right, mut up) = (core::mem::uninitialized(), core::mem::uninitialized(), core::mem::uninitialized());
+			raw::angle_vectors(self, &mut fwd, &mut right, &mut up);
+			(fwd, right, up)
+		}
+	}
 }
 impl core::ops::Add<Vector, Vector> for Vector {
 	fn add(&self, rhs: &Vector) -> Vector {
@@ -484,8 +491,8 @@ impl ConVar {
 	pub unsafe fn changeandfreeze(&mut self, newval: CString) {
 		raw::convar_changeandfreeze(self.get_ptr(), newval)
 	}
-	pub unsafe fn clearflags(&mut self) {
-		raw::convar_clearflags(self.get_ptr())
+	pub fn clearflags(&mut self) {
+		unsafe { raw::concommand_clearflags(self.get_ptr()) }
 	}
 }
 

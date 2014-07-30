@@ -99,7 +99,7 @@ extern "C" {
 	pub fn icvar_findvar(icvar: ICvarPtr, name: * const char) -> ConVarPtr; // MAYBE NULL;
 	pub fn convar_setvalue_raw_int(cvar: ConVarPtr, value: libc::c_int);
 	pub fn convar_setvalue_str(cvar: ConVarPtr, value: CString);
-	pub fn convar_clearflags(cvar: ConVarPtr);
+	pub fn concommand_clearflags(cvar: ConVarPtr);
 	pub fn convar_changeandfreeze(cvar: ConVarPtr, newval: CString);
 	
 	pub fn angle_vectors(angle: &QAngle, vec1: *mut Vector, vec2: *mut Vector, vec3: *mut Vector);

@@ -172,7 +172,6 @@ pub unsafe extern "C" fn rainstorm_postinithook() {
 #[no_mangle]
 pub unsafe extern "C" fn rainstorm_pre_createmove(sequence_number: *mut libc::c_int, input_sample_frametime: *mut libc::c_float, active: *mut bool) {
 	if cheats::CHEAT_MANAGER.is_not_null() {
-		//maybe_hook_inetchannel((*cheats::CHEAT_MANAGER).get_gamepointers());
 		(*cheats::CHEAT_MANAGER).pre_createmove(sequence_number, input_sample_frametime, active);
 	} else {
 		quit!("Cheat manager not found!\n");
@@ -227,7 +226,7 @@ pub extern "C" fn rainstorm_init(log_fd: libc::c_int, hooked_init_trampoline: *c
 	};
 }
 
-/*
+
 /// If we haven't seen this INetChannel before, hook it.
 fn maybe_hook_inetchannel(ptrs: &GamePointers) {
  	static mut LAST_NETCHANNEL: Option<sdk::raw::INetChannelPtr> = None;
@@ -252,7 +251,7 @@ fn maybe_hook_inetchannel(ptrs: &GamePointers) {
  		log!("senddatagram: {}\n", hooker.get_orig_method(46));
 		
  	};
- }*/
+ }
 #[lang = "stack_exhausted"] extern fn stack_exhausted() {}
 #[lang = "eh_personality"] extern fn eh_personality() {}
 
