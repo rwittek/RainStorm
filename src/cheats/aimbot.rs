@@ -41,13 +41,15 @@ pub struct Aimbot {
 	// Ugly scaling factors that should be improved
 	fovweight: f32,
 	distweight: f32,
+	
+	lasttick: i32,
 }
 
 impl Aimbot {
 
 	/// Find the best thing to shoot at... if there is one.
 	/// Otherwise, returns None.
-	fn find_target_spot(&mut self, ptrs: &GamePointers, viewangles: &sdk::QAngle) -> Option<sdk::Vector> {
+	fn find_target(&mut self, ptrs: &GamePointers, viewangles: &sdk::QAngle) -> Option<(i32, sdk::Vector)> {
 		let me: TFPlayer = unsafe { Entity::from_ptr( utils::get_local_player_entity(ptrs)) };
 
 		let mut eyes = me.get_origin();
@@ -70,16 +72,21 @@ impl Aimbot {
 				
 				// can we actually see this?
 				match sdk::utils::trace_to_entity(ptrs, &tempangles) {
-					Some((trace_ent, hit_hitbox)) if trace_ent == ent.get_ptr() => {
+					Some((trace_ent, hit_hitbox)) if trace_ent.get_index() == ent.get_index() => {
 						match hitbox {
 							Some(hb) => {
 								if hb != hit_hitbox {
+									//log!("HIT WRONG HITBOX!\n");
 									return; // we see it, but it's the wrong hitbox!
 								}
 							},
 							None => ()
 						}
 					},
+					Some((trace_ent, hit_hitbox)) => { // Wrong entity!
+						//log!("Wrong entity (hit {} at {})!\n", trace_ent.get_classname(), hit_hitbox);
+						return;
+					}
 					_ => {
 						return
 					}
@@ -92,20 +99,23 @@ impl Aimbot {
 				let targtypepriority = match targtype {
 					Player => {
 						let player: TFPlayer = unsafe { Entity::from_ptr(ent.get_ptr()) };
-						match player.get_class() {
+						let classpriority = match player.get_class() {
 							Scout => 0.0,
 							Soldier => 0.0,
-							Pyro => if dist < 2000.0 { 1000.0 } else { -1000.0 },
+							Pyro => 0.0,
 							Demoman => 0.0,
-							Heavy => if dist < 5000.0 { 1000.0 } else { -1000.0 },
+							Heavy => 0.0,
 							Engineer => -500.0, // engineers aren't really a threat
 							Medic => 2000.0, // kill meds first
-							Sniper => 3000.0 + dist, // snipers are scary even from far away; ignore distance
-							Spy => if dist < 500.0 { 10000.0 } else { -1000.0 }, // backstab THIS
-						}
+							Sniper => dist, // snipers are scary even from far away; ignore distance
+							Spy => if dist < 500.0 { 1000.0 } else { -1000.0 }, // backstab THIS
+						};
+						let healthpriority = 10.0 * (150 - player.get_health()) as f32;
+						
+						classpriority + healthpriority
 					},
 					Dispenser | Teleporter => -5000.0,
-					Sentry => if dist <= 1500.0 { 10000.0 } else { -5000.0 }, // sentries have 1024HU range
+					Sentry => if dist <= 1200.0 { 10000.0 } else { -1000.0 }, // sentries have 1024HU range
 					MVMTank => 0.0, // I don't play enough MVM to know what to put here
 				};
 
@@ -141,15 +151,14 @@ impl Aimbot {
 
 				match targtype {
 					Player => { 	
-						let player: sdk::TFPlayer = unsafe {
+						let mut player: sdk::TFPlayer = unsafe {
 							Entity::from_ptr(ent.get_ptr())
 						};
-							
 						match self.hitbox {
 							Some(hitbox) => {
 								
-								let hitbox_pos = player.get_hitbox_position(ptrs.ivmodelinfo, hitbox);
-			
+								let mut hitbox_pos = player.get_hitbox_position(ptrs.ivmodelinfo, hitbox);
+								hitbox_pos = hitbox_pos;
 								prioritize(hitbox_pos, &ent as &Entity, Some(hitbox), targtype)
 							},
 							None => {
@@ -167,9 +176,7 @@ impl Aimbot {
 			}
 		}
 		
-		best_targ.map(|(_, pos)| {
-			pos
-		})
+		best_targ.map(|(ent, pos)| (ent.get_index(), pos))
 		
 		/*+ {
 				(ent.get_velocity() - me.get_velocity()).scale(unsafe { sdk::raw::get_current_latency(ptrs.ivengineclient.get_ptr()) })
@@ -177,7 +184,7 @@ impl Aimbot {
 		})*/
 	}
 			
-	fn aim_at_target(&mut self, ptrs: &GamePointers, cmd: &mut sdk::CUserCmd, target: sdk::Vector) {
+	fn aim_at_target(&mut self, ptrs: &GamePointers, cmd: &mut sdk::CUserCmd, target: sdk::Vector) {	
 		let me = utils::get_local_player_entity(ptrs);
 
 		let mut eyes = me.get_origin();
@@ -188,6 +195,7 @@ impl Aimbot {
 			eyes.y += (eye_offsets)[1];
 			eyes.z += (eye_offsets)[2];
 		}
+		
 		let aimvec = target - eyes;
 		
 		let oldviewangles = cmd.viewangles;
@@ -195,6 +203,33 @@ impl Aimbot {
 		let (forwardmove, sidemove, upmove) = sdk::utils::rotate_movement((cmd.forwardmove, cmd.sidemove, cmd.upmove), oldviewangles, cmd.viewangles);
 		cmd.forwardmove = forwardmove; cmd.sidemove = sidemove; cmd.upmove = upmove;
 	}
+	fn predict(&mut self, ptrs: &GamePointers, interpdata: Option<(i32, sdk::Vector)>) -> Option<sdk::Vector> {
+		interpdata.map(|(entidx, pos)| pos)
+		/*let currtime = ptrs.ivengineclient.time();
+		
+		let interpdata_record = self.interpdata;
+		self.interpdata = [interpdata_record[1], interpdata.map(|(entidx, aim)| (entidx, aim, currtime))];
+		
+		match interpdata {
+			Some((entidx, aim)) => {
+				match interpdata_record {
+					[Some((lastent, lastaim, lasttime)), Some((lastlastent, lastlastaim, lastlasttime))] if lastent == entidx => {
+						let delta_t = currtime - lasttime;
+						let vel = (aim - lastaim).scale(1.0 / delta_t);
+						let oldvel = (lastaim - lastlastaim).scale(1.0 / (lasttime - lastlasttime));
+						let accel = (vel - oldvel).scale(1.0 / delta_t);
+						
+						Some(aim + (vel + accel.scale(delta_t)).scale(delta_t))
+					},
+					_ => { // invalid interpdata
+						None
+					}
+				}
+			},
+			None => None
+		*/
+	}
+				
 }
 
 impl Cheat for Aimbot {
@@ -207,6 +242,8 @@ impl Cheat for Aimbot {
 			// these values are not remotely on the same scale
 			fovweight: 0.0,
 			distweight: 1.0,
+			
+			lasttick: 0
 		}
 	}
 	fn get_name<'a>(&'a self) -> &'a str {
@@ -216,19 +253,26 @@ impl Cheat for Aimbot {
 		if !self.enabled {
 			return;
 		}
+		let lasttick = if self.lasttick != 0 {self.lasttick} else {cmd.tick_count};
+		self.lasttick = cmd.tick_count;
+		
+		cmd.tick_count = lasttick; // hitreg fix
+		//log!("tick shifted by {} to {}\n", cmd.tick_count - self.lasttick, cmd.tick_count);
 		if cmd.buttons & sdk::IN_ATTACK == 0 {
 			return; // not attacking, who cares
 		}
 		
-		let maybe_targspot = self.find_target_spot(ptrs, &cmd.viewangles);
-		match maybe_targspot {
-			Some(targspot) => { self.aim_at_target(ptrs, cmd, targspot) },
-			None => {
+		let maybe_target = self.find_target(ptrs, &cmd.viewangles);
+		let predicted_target = self.predict(ptrs, maybe_target);
+		match predicted_target {
+			Some(target) => {
+				self.aim_at_target(ptrs, cmd, target);
+			},
+			None => { // nothing to aim at
 				if self.stop_firing != 0 {
-					cmd.buttons = cmd.buttons & (!sdk::IN_ATTACK)
-				};
-				return
-			} // nothing to aim at
+					cmd.buttons &= (!sdk::IN_ATTACK)
+				}
+			} 
 		}
 	}
 

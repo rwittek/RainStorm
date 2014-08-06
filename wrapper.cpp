@@ -93,6 +93,7 @@
 #include "public\IGameUIFuncs.h"
 #include "public\toolframework\IEngineTool.h"
 #include "public\inetchannel.h"
+#include "public\inetmessage.h"
 //===================================================================================
 // IBaseClientDLL interface from SDK
 //===================================================================================
@@ -485,22 +486,51 @@ void rainstorm_command_cb_trampoline( const CCommand &args ) { rainstorm_command
 
 ConCommand rainstorm_command("rainstorm", rainstorm_command_cb_trampoline);
 
+bool	bDataCompare( const BYTE* pData, const BYTE* bMask, const char* szMask )
+{
+	for( ; *szMask; ++szMask, ++pData, ++bMask )
+		if( *szMask == 'x' && *pData != *bMask )
+			return false;
 
+	return ( *szMask ) == NULL;
+}
+DWORD dwFindPattern ( DWORD dwAddress, DWORD dwSize, BYTE* pbMask, char* szMask )
+{
+	for( DWORD i = NULL; i < dwSize; i++ )
+		if( bDataCompare( (BYTE*) ( dwAddress + i ), pbMask, szMask ) )
+			return (DWORD)( dwAddress + i );
+
+	return 0;
+}
 
 extern "C" CInput *CINPUT_PTR;
 extern "C" bool NOCMD_ENABLED;
 IClientEntityList *ENTLISTPTR;
 extern "C" int ( __stdcall *REAL_INIT)( CreateInterfaceFn appSysFactory, CreateInterfaceFn physicsFactory, CGlobalVarsBase* pGlobals );
 extern "C" void (__stdcall *REAL_CREATEMOVE)( int sequence_number, float input_sample_frametime, bool active );
+extern "C" void (__stdcall *REAL_EXTRAMOUSESAMPLE)( float input_sample_frametime, bool active );
+extern "C" void (__fastcall *REAL_SERVERCMDKEYVALUES)( IVEngineClient *_this, int edx, KeyValues *kv );
 extern "C" bool (__fastcall *REAL_NETCHANNEL_SENDDATAGRAM)(INetChannel *chan, int ignoreme, bf_write *data);
+bool (__fastcall *COPIED_NETCHANNEL_SENDDATAGRAM)(INetChannel *chan, int ignoreme, bf_write *data) = NULL;
 extern "C" void rainstorm_preinithook( CreateInterfaceFn appSysFactory, CreateInterfaceFn physicsFactory, CGlobalVarsBase* pGlobals );
 extern "C" void rainstorm_postinithook();
 extern "C" void rainstorm_pre_createmove(int *sequence_number_ptr, float *input_sample_frametime_ptr, bool *active_ptr);
 extern "C" void rainstorm_process_usercmd(CUserCmd *cmd);
+extern "C" void rainstorm_extramousesample(float input_sample_frametime, bool active);
 extern "C" IVEngineClient *rainstorm_getivengineclient();
-extern "C" void rainstorm_init(int log_fd, void * hooked_init_trampoline, void *hooked_createmove_trampoline);
+extern "C" void rainstorm_init(int log_fd, void * hooked_init_trampoline, void *hooked_createmove_trampoline, void *hooked_extramousesample_trampoline);
 extern "C" int LOG_FD;
+CGlobalVarsBase *globals_ptr = NULL;
+void __stdcall hooked_servercmdkeyvalues( KeyValues *kv ) {
+	fprintf(logfile, "KeyValues handling...\n");
+	//KeyValuesDumpAsDevMsg(kv);
+	//REAL_SERVERCMDKEYVALUES(_this, edx, kv);
+}
+extern "C" void *get_hooked_servercmdkeyvalues() {
+	return &hooked_servercmdkeyvalues;
+}
 int __stdcall hooked_init_trampoline( CreateInterfaceFn appSysFactory, CreateInterfaceFn physicsFactory, CGlobalVarsBase* pGlobals ) {
+	globals_ptr = pGlobals;
 	AppSysFactory = appSysFactory;
 	if (REAL_INIT != NULL) {
 		rainstorm_preinithook(appSysFactory, physicsFactory, pGlobals);
@@ -526,22 +556,37 @@ void __stdcall hooked_createmove_trampoline( int sequence_number, float input_sa
 		
 	static CUserCmd* pCommands = *(CUserCmd**)((DWORD)CINPUT_PTR + 0xC4);  
 	CUserCmd* pCommand = &pCommands[ sequence_number % 90 ];
-	
-	
+
 	rainstorm_process_usercmd(pCommand);
 	
 	CVerifiedUserCmd *pSafeCommand = *reinterpret_cast<CVerifiedUserCmd**>((size_t)CINPUT_PTR + 0xC8) + (sequence_number%90);
 	pSafeCommand->m_cmd = *pCommand;
 	pSafeCommand->m_crc = pSafeCommand->m_cmd.GetChecksum();
 }
+void __stdcall hooked_extramousesample_trampoline( float input_sample_frametime, bool active )
+{
+	rainstorm_extramousesample(input_sample_frametime, active);
+	REAL_EXTRAMOUSESAMPLE(input_sample_frametime, active);
+}
+
 extern "C" Vector c_baseentity_getvelocity(C_BaseEntity *ent) {
 	return ent->GetBaseVelocity() + ent->GetLocalVelocity();
 }
 
 bool __fastcall hooked_netchannel_senddatagram_trampoline(INetChannel *chan, int ignoreme, bf_write *data) {
-	*(int *)(( (int) chan ) + 0x1C) = 69; // hue
+	//fprintf(logfile, "SendDatagram\n");
+	/*if (COPIED_NETCHANNEL_SENDDATAGRAM == NULL) {
+		fprintf(logfile, "Copying!\n");
+		unsigned long oldprotect;
+		VirtualProtect((void *)((int)REAL_NETCHANNEL_SENDDATAGRAM & 0xFFFFF000), 6000, PAGE_READWRITE, &oldprotect);
+		*(unsigned short *)((int)REAL_NETCHANNEL_SENDDATAGRAM + 0x198) = 0x9090; // nop it out
+		VirtualProtect((void *)((int)REAL_NETCHANNEL_SENDDATAGRAM & 0xFFFFF000), 6000, PAGE_EXECUTE, &oldprotect);
+		FlushInstructionCache(GetCurrentProcess(), NULL, 0);
+		COPIED_NETCHANNEL_SENDDATAGRAM = REAL_NETCHANNEL_SENDDATAGRAM;
+	}*/
+	
 	if (NOCMD_ENABLED) {
-		return REAL_NETCHANNEL_SENDDATAGRAM(chan, ignoreme, data);
+		return true;
 	} else {
 		return REAL_NETCHANNEL_SENDDATAGRAM(chan, ignoreme, data);
 	}
@@ -577,7 +622,9 @@ extern "C" float get_current_latency(IVEngineClient *engine) {
 
 DWORD WINAPI startup_thread( LPVOID lpArguments ) {
 	logfile = fopen("rainstorm_debug.txt", "w");
-	rainstorm_init(fileno(logfile), (void*)&hooked_init_trampoline, (void*)&hooked_createmove_trampoline);
+	setbuf(logfile, NULL);
+	
+	rainstorm_init(fileno(logfile), (void*)&hooked_init_trampoline, (void*)&hooked_createmove_trampoline, (void *)&hooked_extramousesample_trampoline);
 	//exit(1);
 	return 0;
 }
@@ -630,6 +677,36 @@ extern "C" IUniformRandomStream * getptr_iuniformrandomstream () {
 }
 
 
+// HACK HACK REMOVE THIS!!!!
+extern "C" bool is_shoot_critical(int iSeed, C_BaseCombatWeapon *pBaseWeapon) {
+	return false;
+	//sig from crapstorm
+	//dwFindPattern( (DWORD)GetModuleHandle("client.dll"), 0x5F6000, (BYTE*)"\x8B\x44\x24\x04\x85\xC0\x75\x0B\xC7\x05\x00\x00\x00\x00\xFF\xFF\xFF\xFF\xC3", "xxxxxxxxxx????xxxxx" );
+	//(int *)((DWORD)GetModuleHandleA( "client.dll" ) + 0xB1AFE8); 
+             
+    // typedef bool ( __thiscall* CalcIsAttackCriticalHelper)( C_BaseCombatWeapon* ); 
+
+	// int *wepseed = (int *)(((int)pBaseWeapon)+0x0AB4 + 8);
+	// int oldwepseed = *wepseed;
+	// int oldglobalseed = *pGlobalSeed;
+    // *pGlobalSeed = iSeed;
+	
+    // /*int weaponSeedBackup  = *Ptr(int*, pBaseWeapon, 0xA4C);  
+    // float checkTimeBackup = *Ptr(float*, pBaseWeapon, 0xA44);  
+    // float critTimeBackup  = *Ptr(float*, pBaseWeapon, 0xA40);  
+      // */   
+	// fprintf(logfile, "%p\n", ((PDWORD*)pBaseWeapon)[ 388 ]);
+	
+    // bool bResult = ( (CalcIsAttackCriticalHelper)(*(PDWORD*)pBaseWeapon)[ 388 ] )( pBaseWeapon ); 
+     
+	 // *wepseed = oldwepseed;
+	 // *pGlobalSeed = oldglobalseed;
+    // /* *Ptr(int*, pBaseWeapon, 0xA4C)    	= weaponSeedBackup; 
+    // *Ptr(float*, pBaseWeapon, 0xA44) = checkTimeBackup; 
+    // *Ptr(float*, pBaseWeapon, 0xA40) = critTimeBackup; */
+	
+    // return bResult; 
+}
 extern "C" IVEngineClient * getptr_ivengineclient() {
 	HMODULE hmEngine = GetModuleHandleSafe( "engine.dll" );
 	CreateInterfaceFn EngineFactory = ( CreateInterfaceFn ) GetProcAddress( hmEngine, "CreateInterface" );
@@ -762,6 +839,7 @@ void get_bone_position(C_BaseAnimating *ent, IVModelInfo *modelinfo, int iBone, 
 }
 void get_hitbox_position(C_BaseAnimating *ent, IVModelInfo *modelinfo, int hitboxIndex, Vector &origin )
 {
+
 	int bone = -1;
 	studiohdr_t *pStudioHdr = modelinfo->GetStudiomodel(ent->GetModel());
 	Vector bbmax, bbmin;
@@ -789,6 +867,7 @@ void get_hitbox_position(C_BaseAnimating *ent, IVModelInfo *modelinfo, int hitbo
 	VectorTransform(bbmin, bonetoworld[bone], bbmin_world);
 	
 	origin = (bbmax_world + bbmin_world)/2.0;
+	globals_ptr->curtime -= 1.0/66.0;
 }
 
 extern "C" void c_baseanimating_gethitboxposition(C_BaseAnimating *ent, IVModelInfo *modelinfo, int iHitbox, Vector &origin ) {
@@ -850,8 +929,8 @@ bool TriggerbotTraceFilter::ShouldHitEntity( IHandleEntity* pHandle, int content
     ClientClass* pEntCC = pEnt->GetClientClass();
     const char* ccName = pEntCC->GetName();
 	//fprintf(logfile, "%s\n", ccName);
-    if ( strcmp(ccName, "CFuncRespawnRoomVisualizer") == 0 || strcmp(ccName, "CTFMedigunShield") == 0 )// ||
-       // strcmp(ccName,"CFuncAreaPortalWindow") == 0)
+    if ( strcmp(ccName, "CFuncRespawnRoomVisualizer") == 0 || strcmp(ccName, "CTFMedigunShield") == 0 )
+		//|| strcmp(ccName,"CFuncAreaPortalWindow") == 0  || strcmp(ccName, "CBaseEntity"))
     {
         return false;
     }
@@ -885,4 +964,182 @@ extern "C" int calc_seed_from_command_number(int commandnum) {
 }
 extern "C" int icliententitylist_get_highest_entity_index(IClientEntityList *entlist) {
 	return entlist->GetHighestEntityIndex();
+}
+bool IKeyValuesDumpContextAsText::KvBeginKey( KeyValues *pKey, int nIndentLevel )
+{
+	if ( pKey )
+	{
+		return
+			KvWriteIndent( nIndentLevel ) &&
+			KvWriteText( pKey->GetName() ) &&
+			KvWriteText( " {\n" );
+	}
+	else
+	{
+		return
+			KvWriteIndent( nIndentLevel ) &&
+			KvWriteText( "<< NULL >>\n" );
+	}
+}
+
+bool IKeyValuesDumpContextAsText::KvWriteValue( KeyValues *val, int nIndentLevel )
+{
+	if ( !val )
+	{
+		return
+			KvWriteIndent( nIndentLevel ) &&
+			KvWriteText( "<< NULL >>\n" );
+	}
+
+	if ( !KvWriteIndent( nIndentLevel ) )
+		return false;
+
+	if ( !KvWriteText( val->GetName() ) )
+		return false;
+
+	if ( !KvWriteText( " " ) )
+		return false;
+
+	switch ( val->GetDataType() )
+	{
+	case KeyValues::TYPE_STRING:
+		{
+			if ( !KvWriteText( val->GetString() ) )
+				return false;
+		}
+		break;
+
+	case KeyValues::TYPE_INT:
+		{
+			int n = val->GetInt();
+			char *chBuffer = ( char * ) stackalloc( 128 );
+			V_snprintf( chBuffer, 128, "int( %d = 0x%X )", n, n );
+			if ( !KvWriteText( chBuffer ) )
+				return false;
+		}
+		break;
+
+	case KeyValues::TYPE_FLOAT:
+		{
+			float fl = val->GetFloat();
+			char *chBuffer = ( char * ) stackalloc( 128 );
+			V_snprintf( chBuffer, 128, "float( %f )", fl );
+			if ( !KvWriteText( chBuffer ) )
+				return false;
+		}
+		break;
+
+	case KeyValues::TYPE_PTR:
+		{
+			void *ptr = val->GetPtr();
+			char *chBuffer = ( char * ) stackalloc( 128 );
+			V_snprintf( chBuffer, 128, "ptr( 0x%p )", ptr );
+			if ( !KvWriteText( chBuffer ) )
+				return false;
+		}
+		break;
+
+	case KeyValues::TYPE_WSTRING:
+		{
+			wchar_t const *wsz = val->GetWString();
+			int nLen = V_wcslen( wsz );
+			int numBytes = nLen*2 + 64;
+			char *chBuffer = ( char * ) stackalloc( numBytes );
+			V_snprintf( chBuffer, numBytes, "%ls [wstring, len = %d]", wsz, nLen );
+			if ( !KvWriteText( chBuffer ) )
+				return false;
+		}
+		break;
+
+	case KeyValues::TYPE_UINT64:
+		{
+			uint64 n = val->GetUint64();
+			char *chBuffer = ( char * ) stackalloc( 128 );
+			V_snprintf( chBuffer, 128, "u64( %lld = 0x%llX )", n, n );
+			if ( !KvWriteText( chBuffer ) )
+				return false;
+		}
+		break;
+
+	default:
+		break;
+		{
+			int n = val->GetDataType();
+			char *chBuffer = ( char * ) stackalloc( 128 );
+			V_snprintf( chBuffer, 128, "??kvtype[%d]", n );
+			if ( !KvWriteText( chBuffer ) )
+				return false;
+		}
+		break;
+	}
+
+	return KvWriteText( "\n" );
+}
+
+bool IKeyValuesDumpContextAsText::KvEndKey( KeyValues *pKey, int nIndentLevel )
+{
+	if ( pKey )
+	{
+		return
+			KvWriteIndent( nIndentLevel ) &&
+			KvWriteText( "}\n" );
+	}
+	else
+	{
+		return true;
+	}
+}
+
+bool IKeyValuesDumpContextAsText::KvWriteIndent( int nIndentLevel )
+{
+	int numIndentBytes = ( nIndentLevel * 2 + 1 );
+	char *pchIndent = ( char * ) stackalloc( numIndentBytes );
+	memset( pchIndent, ' ', numIndentBytes - 1 );
+	pchIndent[ numIndentBytes - 1 ] = 0;
+	return KvWriteText( pchIndent );
+}
+
+
+bool CKeyValuesDumpContextAsDevMsg::KvBeginKey( KeyValues *pKey, int nIndentLevel )
+{
+	static ConVarRef r_developer( "developer" );
+	if ( r_developer.IsValid() && r_developer.GetInt() < m_nDeveloperLevel )
+		// If "developer" is not the correct level, then avoid evaluating KeyValues tree early
+		return false;
+	else
+		return IKeyValuesDumpContextAsText::KvBeginKey( pKey, nIndentLevel );
+}
+
+bool CKeyValuesDumpContextAsDevMsg::KvWriteText( char const *szText )
+{
+	if ( m_nDeveloperLevel > 0 )
+	{
+		DevMsg( m_nDeveloperLevel, "%s", szText );
+	}
+	else
+	{
+		Msg( "%s", szText );
+	}
+	return true;
+}
+bool KeyValues::Dump( IKeyValuesDumpContext *pDump, int nIndentLevel /* = 0 */ )
+{
+	if ( !pDump->KvBeginKey( this, nIndentLevel ) )
+		return false;
+
+	// Dump values
+	for ( KeyValues *val = this ? GetFirstValue() : NULL; val; val = val->GetNextValue() )
+	{
+		if ( !pDump->KvWriteValue( val, nIndentLevel + 1 ) )
+			return false;
+	}
+
+	// Dump subkeys
+	for ( KeyValues *sub = this ? GetFirstTrueSubKey() : NULL; sub; sub = sub->GetNextTrueSubKey() )
+	{
+		if ( !sub->Dump( pDump, nIndentLevel + 1 ) )
+			return false;
+	}
+
+	return pDump->KvEndKey( this, nIndentLevel );
 }

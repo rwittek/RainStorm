@@ -16,6 +16,7 @@ pub mod nospread;
 pub mod crithack;
 pub mod bhop;
 pub mod condremover;
+pub mod spinbot;
 
 pub static mut CHEAT_MANAGER: *mut CheatManager = 0 as *mut CheatManager;
 
@@ -38,13 +39,16 @@ pub trait Cheat {
 	fn preinit(&mut self, ptrs: &GamePointers) {}
 	#[allow(unused_variable)]
 	fn postinit(&mut self, ptrs: &GamePointers) {}
+	
 	#[allow(unused_variable)]
 	fn pre_createmove(&mut self, ptrs: &GamePointers, sequence_number: *mut libc::c_int,
-			input_sample_frametime: *mut libc::c_float, active: *mut bool) {}
-			
+			input_sample_frametime: *mut libc::c_float, active: *mut bool) {}		
 	#[allow(unused_variable)]
 	fn process_usercmd(&mut self, ptrs: &GamePointers, &mut sdk::CUserCmd) {}
-	
+	#[allow(unused_variable)]
+	fn extramousesample(&mut self, ptrs: &GamePointers, input_sample_frametime: *mut libc::c_float,
+			active: *mut bool) {}
+			
 	#[allow(unused_variable)]
 	fn enable(&mut self) {}
 	#[allow(unused_variable)]
@@ -74,6 +78,7 @@ impl CheatManager {
 		let crithack: Box<crithack::Crithack> = box Cheat::new();
 		let bhop: Box<bhop::Bunnyhop> = box Cheat::new();
 		let condremover: Box<condremover::CondRemover> = box Cheat::new();
+		let spinbot: Box<spinbot::Spinbot> = box Cheat::new();
 		log!("Creating CheatManager...\n");
 		let mut mgr = CheatManager { 
 			cheats: Vec::new(),
@@ -90,6 +95,7 @@ impl CheatManager {
 		mgr.cheats.push(namechanger);
 		mgr.cheats.push(nocmd);
 		mgr.cheats.push(bhop);
+		mgr.cheats.push(spinbot);
 		mgr.cheats.push(condremover);
 		mgr
 	}

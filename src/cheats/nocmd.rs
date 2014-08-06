@@ -1,16 +1,23 @@
-use {Cheat};
+use {Cheat, GamePointers};
+use sdk;
 
-pub struct NoCmd;
+pub struct NoCmd {
+	enabled: bool
+}
 
 impl Cheat for NoCmd {
 	fn new() -> NoCmd {
-		NoCmd
+		NoCmd { enabled: false }
 	}
 	fn get_name<'a>(&'a self) -> &'a str {
 		"NoCmd"
 	}
 
-	
-	fn enable(&mut self) { unsafe { ::NOCMD_ENABLED = true; } }
-	fn disable(&mut self) { unsafe { ::NOCMD_ENABLED = false; }}
+	fn process_usercmd(&mut self, ptrs: &GamePointers, cmd: &mut sdk::CUserCmd) {
+		if self.enabled {
+			cmd.tick_count = 0xFFFF; // lol
+		}
+	}
+	fn enable(&mut self) {  self.enabled = true; }
+	fn disable(&mut self) { self.enabled = false; }
 }

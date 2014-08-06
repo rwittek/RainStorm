@@ -43,7 +43,7 @@ pub fn trace_to_entity(ptrs: &GamePointers, viewangles: &QAngle) -> Option<(raw:
 	
 	let ray = Ray_t::new(&eyes, &trace_direction);
 
-	ptrs.ienginetrace.trace_ray(&ray, 0x4600400B, Some(get_tracefilter(me)), &mut trace);
+	ptrs.ienginetrace.trace_ray(&ray, 0x200400B, Some(get_tracefilter(me)), &mut trace);
 	
 	if trace.base.allsolid  {
 		None
@@ -55,16 +55,11 @@ pub fn trace_to_entity(ptrs: &GamePointers, viewangles: &QAngle) -> Option<(raw:
 }
 
 pub fn is_commandnum_critical<WepType: sdk::CombatWeapon>(ptrs: &GamePointers, weapon: WepType, commandnum: i32) -> bool {
-	let index = match weapon.is_melee() {
-		true => (weapon.get_index() << 16) | (ptrs.ivengineclient.get_local_player() << 8),
-		false => (weapon.get_index() << 8) | ptrs.ivengineclient.get_local_player()
-	};
-
-	let global_seed = unsafe { raw::calc_seed_from_command_number(commandnum) };
+	let seed = unsafe { raw::calc_seed_from_command_number(commandnum) };
 	
-	ptrs.iuniformrandomstream.set_seed(global_seed ^ index);
-	
-	ptrs.iuniformrandomstream.random_int(0, 9999) < match weapon.is_melee() { true => 1500, false => 50 }
+	unsafe {
+		raw::is_shoot_critical(seed, weapon.get_ptr())
+	}
 }
 /// Iterates through all entities.
 pub struct EntityIterator {

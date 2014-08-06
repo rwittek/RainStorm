@@ -75,6 +75,10 @@ pub static mut REAL_INIT: *const () = 0 as *const();
 #[no_mangle]
 pub static mut REAL_CREATEMOVE: *const () = 0 as *const ();
 #[no_mangle]
+pub static mut REAL_EXTRAMOUSESAMPLE: *const () = 0 as *const ();
+#[no_mangle]
+pub static mut REAL_SERVERCMDKEYVALUES: *const () = 0 as *const ();
+#[no_mangle]
 pub static mut REAL_NETCHANNEL_SENDDATAGRAM: *const () = 0 as *const ();
 #[no_mangle]
 pub static mut CINPUT_PTR: *mut sdk::CInput = 0 as *mut sdk::CInput;
@@ -147,6 +151,7 @@ pub unsafe fn locate_cinput() -> Option<*mut sdk::CInput> {
 		}
 	}
 }
+
 #[no_mangle]
 pub unsafe extern "C" fn rainstorm_preinithook(app_sys_factory: sdk::AppSysFactoryPtr, _physics_factory: *mut (), _globals: *mut ()) {
 	log!("pre-init hook running\n");
@@ -189,6 +194,15 @@ pub unsafe extern "C" fn rainstorm_process_usercmd(cmd: &mut sdk::CUserCmd) {
 }
 
 #[no_mangle]
+pub unsafe extern "C" fn rainstorm_extramousesample(input_sample_frametime: libc::c_float, active: bool) {
+	if cheats::CHEAT_MANAGER.is_not_null() {
+		(*cheats::CHEAT_MANAGER).extramousesample(input_sample_frametime, active);
+	} else {
+		quit!("Cheat manager not found!\n");
+	};
+}
+
+#[no_mangle]
 pub extern "C" fn rainstorm_command_cb(c_arguments: *const libc::c_char) {
 	let arguments_str = unsafe { core::str::raw::c_str_to_static_slice(c_arguments) };
 	log!("Command callback: {}\n", arguments_str);
@@ -205,7 +219,8 @@ pub extern "C" fn rainstorm_command_cb(c_arguments: *const libc::c_char) {
 }
 
 #[no_mangle]
-pub extern "C" fn rainstorm_init(log_fd: libc::c_int, hooked_init_trampoline: *const (), hooked_createmove_trampoline: *const ()) {
+pub extern "C" fn rainstorm_init(log_fd: libc::c_int, hooked_init_trampoline: *const (), hooked_createmove_trampoline: *const (),
+		hooked_extramousesample_trampoline: *const ()) {
 	unsafe { let _ = logging::set_fd(log_fd).unwrap(); }
 	log!("Rainstorm starting up!\n");
 
@@ -215,9 +230,15 @@ pub extern "C" fn rainstorm_init(log_fd: libc::c_int, hooked_init_trampoline: *c
 		let mut ibaseclientdll_hooker = vmthook::VMTHooker::new((*cheats::CHEAT_MANAGER).get_gamepointers().ibaseclientdll.get_ptr().to_uint() as *mut *const ());
 		REAL_INIT = ibaseclientdll_hooker.get_orig_method(0);
 		REAL_CREATEMOVE = ibaseclientdll_hooker.get_orig_method(21);
+		REAL_EXTRAMOUSESAMPLE = ibaseclientdll_hooker.get_orig_method(22);
 		
 		ibaseclientdll_hooker.hook(0, hooked_init_trampoline);
 		ibaseclientdll_hooker.hook(21, hooked_createmove_trampoline);
+		ibaseclientdll_hooker.hook(22, hooked_extramousesample_trampoline);
+		
+		// let mut ivengineclient_hooker = vmthook::VMTHooker::new((*cheats::CHEAT_MANAGER).get_gamepointers().ivengineclient.get_ptr().to_uint() as *mut *const ());
+		// REAL_SERVERCMDKEYVALUES = ivengineclient_hooker.get_orig_method(185);
+		// ivengineclient_hooker.hook(185, sdk::raw::get_hooked_servercmdkeyvalues());
 		
 
 		CINPUT_PTR = locate_cinput().expect("Failed to locate CInput pointer (signature not found)");

@@ -42,15 +42,21 @@ pub trait Entity: core::kinds::Copy {
 }*/
 
 pub trait Animating: Entity {
-	fn get_hitbox_position(&self, modelinfo: IVModelInfo, hitbox: i32) -> Vector {
+	fn get_hitbox_position(&mut self, modelinfo: IVModelInfo, hitbox: i32) -> Vector {
 		unsafe { 
+	//		log!("animating: {}, {}\n", *self.ptr_offset::<f32>(0x07F8), *self.ptr_offset::<f32>(0x07F8 + 0x14));
+	//		*self.mut_ptr_offset::<f32>(0x07F8) += 1.0/66.0;
+			
 			let mut origin = core::mem::uninitialized();
 			raw::c_baseanimating_gethitboxposition(self.get_ptr(), modelinfo.get_ptr(), hitbox, &mut origin);
+			
+		//	*self.mut_ptr_offset::<f32>(0x07F8) -= 1.0 / 66.0; // reverse tick update
+			
 			origin
 		}
 	}
 	fn get_bone_position(&self, modelinfo: IVModelInfo, bone: i32) -> Vector {
-		unsafe { 
+		unsafe {
 			let mut origin = core::mem::uninitialized();
 			raw::c_baseanimating_getboneposition(self.get_ptr(), modelinfo.get_ptr(), bone, &mut origin);
 			origin
@@ -90,7 +96,7 @@ impl Entity for BaseCombatWeapon {
 impl Animating for BaseCombatWeapon {}
 impl CombatWeapon for BaseCombatWeapon {
 	fn is_melee(&self) -> bool {
-		true // FIXME
+		false // FIXME
 	}
 }
 
@@ -105,6 +111,9 @@ impl TFPlayer {
 	pub fn get_class(&self) -> TFClass {
 		let classnum = unsafe {*(self.ptr_offset::<u32>(0x1528))};
 		FromPrimitive::from_u32(classnum).expect("Invalid class number?")
+	}
+	pub fn get_health(&self) -> i32 {
+		unsafe { *self.ptr_offset(0x00A4) }
 	}
 }
 impl Entity for TFPlayer {

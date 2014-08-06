@@ -4,7 +4,8 @@ use sdk;
 use core::prelude::*;
 use sdk::Entity;
 use sdk::utils;
-
+use libc;
+	
 pub struct Crithack {
 	enabled: bool,
 }
@@ -17,31 +18,32 @@ impl Cheat for Crithack {
 	fn get_name<'a>(&'a self) -> &'a str {
 		"Crithack"
 	}
+	fn pre_createmove(&mut self, ptrs: &GamePointers, sequence_number: *mut libc::c_int,
+			input_sample_frametime: *mut libc::c_float, active: *mut bool) {
+	}
 	fn process_usercmd(&mut self, ptrs: &GamePointers, cmd: &mut sdk::CUserCmd) {
-		if !self.enabled {
-			return;
-		}
-		if cmd.buttons & sdk::IN_ATTACK == 0 {
-			return;
-		}
-		
+	}/*
 		let me = utils::get_local_player_entity(ptrs);
 		
 		let wep: sdk::BaseCombatWeapon = unsafe {
 			match ptrs.icliententitylist.get_client_entity_from_handle(*me.ptr_offset::<sdk::CBaseHandle>(0x0DA8)) {
 				Some(wep) => Entity::from_ptr(wep),
 				None => return // no active weapon
-		}
+			}
 		};
 		
-		let mut try_cmdnum = cmd.command_number;
-		while !sdk::utils::is_commandnum_critical(ptrs, wep, try_cmdnum) {
-			try_cmdnum = try_cmdnum + 1;
+		let critbucket = unsafe { *wep.ptr_offset::<f32>(0x09D8 - 12) };
+		//log!("crit bucket: {}\n", critbucket);
+		
+		if (critbucket < 500.0) {
+			//log!("crit bucket too low!\n");
+			return
 		}
 		
-		cmd.command_number = try_cmdnum;
-		cmd.random_seed = unsafe { sdk::raw::calc_seed_from_command_number(try_cmdnum) };
-	}
+		if sdk::utils::is_commandnum_critical(ptrs, wep, cmd.command_number) {
+			cmd.buttons &= !sdk::IN_ATTACK;
+		}
+	}*/
 	fn enable(&mut self) { self.enabled = true; }
 	fn disable(&mut self) { self.enabled = false; }
 				
