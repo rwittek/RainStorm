@@ -464,8 +464,11 @@ impl IEngineTrace {
 		unsafe { raw::ienginetrace_traceray(self.get_ptr(), ray, mask, filter_ptr, trace) };
 	}
 }
+
+// Fixme: should be a trait
 pub enum ConVarValue {
 	Int(i32),
+	Float(f32),
 	Str(CString)
 }
 
@@ -479,13 +482,22 @@ impl ConVar {
 	pub unsafe fn setvalue_raw(&mut self, val: ConVarValue) {
 		match val {
 			Int(v) => raw::convar_setvalue_raw_int(self.get_ptr(), v),
-			Str(s) => raw::convar_setvalue_str(self.get_ptr(), s)
+			Float(f) => raw::convar_setvalue_float(self.get_ptr(), f),
+			Str(s) => raw::convar_setvalue_str(self.get_ptr(), s),
 		}
 	}
-	pub unsafe fn setvalue(&mut self, val: ConVarValue) {
-		match val {
-			Int(v) => raw::convar_setvalue_raw_int(self.get_ptr(), v),
-			Str(s) => raw::convar_setvalue_str(self.get_ptr(), s)
+	pub fn setvalue(&mut self, val: ConVarValue) {
+		unsafe {
+			match val {
+				Int(v) => raw::convar_setvalue_raw_int(self.get_ptr(), v),
+				Float(f) => raw::convar_setvalue_float(self.get_ptr(), f),
+				Str(s) => raw::convar_setvalue_str(self.get_ptr(), s)
+			}
+		}
+	}
+	pub fn getvalue_float(&self) -> ConVarValue {
+		unsafe {
+			Float(raw::convar_getvalue_float(self.get_ptr()))
 		}
 	}
 	pub unsafe fn changeandfreeze(&mut self, newval: CString) {

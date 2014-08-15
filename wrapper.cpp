@@ -745,6 +745,12 @@ extern "C" void convar_setvalue_raw_int(ConVar *cvar, int value) {
 extern "C" void convar_setvalue_str(ConVar *cvar, const char *value) {
 	cvar->SetValue(value);
 }
+extern "C" float convar_getvalue_float(ConVar *cvar) {
+	return cvar->GetFloat();
+}
+extern "C" void convar_setvalue_float(ConVar *cvar, float val) {
+	cvar->SetValue(val);
+}
 extern "C" void concommand_clearflags(ConVar *pVar) {
 	pVar->m_nFlags = FCVAR_NONE;
 }

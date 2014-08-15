@@ -3,7 +3,7 @@ use Cheat;
 use GamePointers;
 
 use sdk;
-use sdk::Entity;
+use sdk::{Entity, TFPlayer, OnTeam, utils};
 
 pub struct Triggerbot {
 	enabled: bool,
@@ -28,12 +28,21 @@ impl Cheat for Triggerbot {
 		if cmd.buttons & 1 == 1 {
 			cmd.buttons = !((!cmd.buttons) | 1); // zero the IN_ATTACK bit
 
-			let trace = sdk::utils::trace_to_entity(ptrs, &cmd.viewangles);
+			let trace = sdk::utils::trace_to_entity_hitbox(ptrs, &cmd.viewangles);
 			match trace {
-				Some((ent, hitbox)) if ent.get_classname() == "CTFPlayer" && hitbox == 0 => { // player in the head
-					self.smoothing_state += 1;
-					if self.smoothing_state > self.smoothing {
-						cmd.buttons = cmd.buttons | 1; // set IN_ATTACK
+				Some((ent, hitbox)) if ent.get_classname() == "CTFPlayer" => { // player
+					let ent: TFPlayer = unsafe { Entity::from_ptr(ent.get_ptr()) };
+					let me: TFPlayer = unsafe { Entity::from_ptr( utils::get_local_player_entity(ptrs)) };
+					
+					if me.get_team() == ent.get_team() {
+						self.smoothing_state += 1;
+						if self.smoothing_state > self.smoothing {
+							cmd.buttons = cmd.buttons | 1; // set IN_ATTACK
+						}
+					} else {
+						if self.smoothing_state > 0 {
+							self.smoothing_state -= 1;
+						}
 					}
 				},
 				_ => {

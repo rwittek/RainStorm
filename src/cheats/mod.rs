@@ -46,8 +46,8 @@ pub trait Cheat {
 	#[allow(unused_variable)]
 	fn process_usercmd(&mut self, ptrs: &GamePointers, &mut sdk::CUserCmd) {}
 	#[allow(unused_variable)]
-	fn extramousesample(&mut self, ptrs: &GamePointers, input_sample_frametime: *mut libc::c_float,
-			active: *mut bool) {}
+	fn extramousesample(&mut self, ptrs: &GamePointers, input_sample_frametime: libc::c_float,
+			active: bool) {}
 			
 	#[allow(unused_variable)]
 	fn enable(&mut self) {}
@@ -153,6 +153,11 @@ impl CheatManager {
 	pub fn process_usercmd(&mut self, cmd: &mut sdk::CUserCmd) {
 		for cheat in self.cheats.mut_iter() {
 			cheat.process_usercmd(&self.ptrs, cmd);
+		}
+	}
+	pub fn extramousesample(&mut self, input_sample_frametime: libc::c_float, active: bool) {
+		for cheat in self.cheats.mut_iter() {
+			cheat.extramousesample(&self.ptrs, input_sample_frametime, active);
 		}
 	}
 	

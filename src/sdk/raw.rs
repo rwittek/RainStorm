@@ -100,6 +100,9 @@ extern "C" {
 	pub fn icvar_findvar(icvar: ICvarPtr, name: * const char) -> ConVarPtr; // MAYBE NULL;
 	pub fn convar_setvalue_raw_int(cvar: ConVarPtr, value: libc::c_int);
 	pub fn convar_setvalue_str(cvar: ConVarPtr, value: CString);
+	pub fn convar_setvalue_float(cvar: ConVarPtr, value: libc::c_float);
+	pub fn convar_getvalue_float(cvar:ConVarPtr) -> libc::c_float;
+	
 	pub fn concommand_clearflags(cvar: ConVarPtr);
 	pub fn convar_changeandfreeze(cvar: ConVarPtr, newval: CString);
 	

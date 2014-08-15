@@ -9,6 +9,9 @@ use sdk::BaseObject;
 use sdk::OnTeam;
 use sdk::{Scout, Soldier, Pyro, Demoman, Heavy, Engineer, Medic, Sniper, Spy};
 use sdk::utils;
+use sdk::Float;
+use libc;
+
 
 #[deriving(Show)]
 pub enum AimbotTargetType {
@@ -18,6 +21,7 @@ pub enum AimbotTargetType {
 	/* poot */ Dispenser, /* here */
 	MVMTank,
 }
+
 
 /// Given an entity, determine what type of aimbot target it is.
 fn get_target_type<EntType: Entity>(_ptrs: &GamePointers, ent: EntType) -> Option<AimbotTargetType> {
@@ -33,6 +37,11 @@ fn get_target_type<EntType: Entity>(_ptrs: &GamePointers, ent: EntType) -> Optio
 	}
 }
 
+pub enum AimbotMode {
+	SemiSilent,
+	Sticky(f32)
+}
+
 pub struct Aimbot {
 	enabled: bool,
 	hitbox: Option<i32>,
@@ -42,7 +51,11 @@ pub struct Aimbot {
 	fovweight: f32,
 	distweight: f32,
 	
-	lasttick: i32,
+	interpdata: Option<(i32, i32, sdk::Vector, sdk::Vector)>,
+	
+	mode: AimbotMode,
+	
+	lasttick: i32
 }
 
 impl Aimbot {
@@ -56,8 +69,8 @@ impl Aimbot {
 		
 		unsafe {
 			let eye_offsets: [f32, ..3] = *(me.ptr_offset(0xF8));
-			eyes.x += (eye_offsets)[0];
-			eyes.y += (eye_offsets)[1];
+			//eyes.x += (eye_offsets)[0];
+			//eyes.y += (eye_offsets)[1];
 			eyes.z += (eye_offsets)[2];
 		}
 		let mut max_priority = core::f32::MIN_VALUE; // this is signed
@@ -71,7 +84,7 @@ impl Aimbot {
 				let tempangles = aimvec.to_angle();
 				
 				// can we actually see this?
-				match sdk::utils::trace_to_entity(ptrs, &tempangles) {
+				match sdk::utils::trace_to_entity(ptrs, &tempangles, 0x200400B) {
 					Some((trace_ent, hit_hitbox)) if trace_ent.get_index() == ent.get_index() => {
 						match hitbox {
 							Some(hb) => {
@@ -105,17 +118,17 @@ impl Aimbot {
 							Pyro => 0.0,
 							Demoman => 0.0,
 							Heavy => 0.0,
-							Engineer => -500.0, // engineers aren't really a threat
-							Medic => 2000.0, // kill meds first
+							Engineer => 0.0,
+							Medic => 300.0, // kill meds first
 							Sniper => dist, // snipers are scary even from far away; ignore distance
 							Spy => if dist < 500.0 { 1000.0 } else { -1000.0 }, // backstab THIS
 						};
-						let healthpriority = 10.0 * (150 - player.get_health()) as f32;
+						let healthpriority = 0.0; // 10.0 * (150 - player.get_health()) as f32;
 						
 						classpriority + healthpriority
 					},
 					Dispenser | Teleporter => -5000.0,
-					Sentry => if dist <= 1200.0 { 10000.0 } else { -1000.0 }, // sentries have 1024HU range
+					Sentry => if dist <= 1500.0 { 10000.0 } else { -100.0 }, // sentries have 1024HU range
 					MVMTank => 0.0, // I don't play enough MVM to know what to put here
 				};
 
@@ -184,42 +197,89 @@ impl Aimbot {
 		})*/
 	}
 			
-	fn aim_at_target(&mut self, ptrs: &GamePointers, cmd: &mut sdk::CUserCmd, target: sdk::Vector) {	
+	fn aim_at_target(&mut self, ptrs: &GamePointers, cmd: &mut sdk::CUserCmd, target: Option<sdk::Vector>) {	
+		use cmath;
+		
 		let me = utils::get_local_player_entity(ptrs);
 
 		let mut eyes = me.get_origin();
 		
 		unsafe {
 			let eye_offsets: [f32, ..3] = *(me.ptr_offset(0xF8));
-			eyes.x += (eye_offsets)[0];
-			eyes.y += (eye_offsets)[1];
+			//eyes.x += (eye_offsets)[0];
+			//eyes.y += (eye_offsets)[1];
 			eyes.z += (eye_offsets)[2];
 		}
 		
-		let aimvec = target - eyes;
-		
-		let oldviewangles = cmd.viewangles;
-		cmd.viewangles = aimvec.to_angle();
-		let (forwardmove, sidemove, upmove) = sdk::utils::rotate_movement((cmd.forwardmove, cmd.sidemove, cmd.upmove), oldviewangles, cmd.viewangles);
-		cmd.forwardmove = forwardmove; cmd.sidemove = sidemove; cmd.upmove = upmove;
+		match self.mode {
+			SemiSilent => {
+				if cmd.buttons & sdk::IN_ATTACK == 0 {
+					return; // not attacking, who cares
+				}
+				match target {
+					Some(target) => {
+						let aimvec = target - eyes;
+						
+						let oldviewangles = cmd.viewangles;
+						cmd.viewangles = aimvec.to_angle();
+						
+						let (forwardmove, sidemove, upmove) = sdk::utils::rotate_movement((cmd.forwardmove, cmd.sidemove, cmd.upmove),
+								oldviewangles, cmd.viewangles);
+						cmd.forwardmove = forwardmove; cmd.sidemove = sidemove; cmd.upmove = upmove;
+					},
+					None => ()
+				}
+			},
+			
+			Sticky(base_sens) => {
+				let mut sens_var = ptrs.icvar.expect("bad ICvar\n").find_var("sensitivity").expect("sens not found!");
+				
+				let sensscale = match target {
+					Some(target) => {
+						let aimvec = target - eyes;
+						
+						let currentaim = cmd.viewangles.to_vector();
+						let cos_fov = aimvec.norm().dotproduct(&currentaim.norm());
+ 
+						::utils::clamp(unsafe { (25.0 * core::num::abs(cmath::acosf(cos_fov)) - 1.0).exp() },
+							0.2,
+							1.5
+						)
+					},
+					None => 1.0
+				};
+				
+				sens_var.setvalue(Float(base_sens * sensscale));
+			}
+		}
 	}
-	fn predict(&mut self, ptrs: &GamePointers, interpdata: Option<(i32, sdk::Vector)>) -> Option<sdk::Vector> {
-		interpdata.map(|(entidx, pos)| pos)
-		/*let currtime = ptrs.ivengineclient.time();
+	fn predict(&mut self, ptrs: &GamePointers, tick: i32, interpdata: Option<(i32, sdk::Vector)>) -> Option<sdk::Vector> {
+		//let currtime = ptrs.ivengineclient.time();
+		
+		let me = utils::get_local_player_entity(ptrs);
+
+		let mut myeyes = me.get_origin();
+		
+		unsafe {
+			let eye_offsets: [f32, ..3] = *(me.ptr_offset(0xF8));
+			//myeyes.x += (eye_offsets)[0];
+			//myeyes.y += (eye_offsets)[1];
+			myeyes.z += (eye_offsets)[2];
+		}
 		
 		let interpdata_record = self.interpdata;
-		self.interpdata = [interpdata_record[1], interpdata.map(|(entidx, aim)| (entidx, aim, currtime))];
+		self.interpdata = interpdata.map(|(targent, targpos)| (targent, tick, targpos, myeyes));
 		
 		match interpdata {
 			Some((entidx, aim)) => {
 				match interpdata_record {
-					[Some((lastent, lastaim, lasttime)), Some((lastlastent, lastlastaim, lastlasttime))] if lastent == entidx => {
-						let delta_t = currtime - lasttime;
-						let vel = (aim - lastaim).scale(1.0 / delta_t);
-						let oldvel = (lastaim - lastlastaim).scale(1.0 / (lasttime - lastlasttime));
-						let accel = (vel - oldvel).scale(1.0 / delta_t);
+					Some((lastent, lasttick, lastaim, lastmyeyes)) if lastent == entidx => {
+						let tick_delta = tick - lasttick;
+						let foo = 1.0 / (tick_delta as f32);
+						let vel = (aim - lastaim).scale(foo);
+						let myvel = (myeyes - lastmyeyes).scale(foo);
 						
-						Some(aim + (vel + accel.scale(delta_t)).scale(delta_t))
+						Some(aim + (vel - myvel)) // this is sometimes wrong, since cmdrate != framerate
 					},
 					_ => { // invalid interpdata
 						None
@@ -227,10 +287,26 @@ impl Aimbot {
 				}
 			},
 			None => None
-		*/
+		}
 	}
-				
+	fn modify_cmd(&mut self, ptrs: &GamePointers, mut cmd: sdk::CUserCmd) -> sdk::CUserCmd {
+		let maybe_target = self.find_target(ptrs, &cmd.viewangles);
+		let predicted_target = maybe_target.map(|(hb, pos)| pos); // self.predict(ptrs, cmd.tick_count, maybe_target);
+		self.aim_at_target(ptrs, &mut cmd, predicted_target);
+		match predicted_target {
+			Some(target) => (),
+			None => { // nothing to aim at
+				if self.stop_firing != 0 {
+					cmd.buttons &= (!sdk::IN_ATTACK)
+				}
+			} 
+		}
+		
+	
+		cmd
+	}
 }
+
 
 impl Cheat for Aimbot {
 	fn new() -> Aimbot {
@@ -243,40 +319,29 @@ impl Cheat for Aimbot {
 			fovweight: 0.0,
 			distweight: 1.0,
 			
-			lasttick: 0
+			interpdata: None,
+			
+			mode: SemiSilent,
+			
+			lasttick: 0,
 		}
 	}
 	fn get_name<'a>(&'a self) -> &'a str {
 		"Aimbot"
 	}
+
 	fn process_usercmd(&mut self, ptrs: &GamePointers, cmd: &mut sdk::CUserCmd) {
 		if !self.enabled {
 			return;
 		}
-		let lasttick = if self.lasttick != 0 {self.lasttick} else {cmd.tick_count};
-		self.lasttick = cmd.tick_count;
 		
-		cmd.tick_count = lasttick; // hitreg fix
-		//log!("tick shifted by {} to {}\n", cmd.tick_count - self.lasttick, cmd.tick_count);
-		if cmd.buttons & sdk::IN_ATTACK == 0 {
-			return; // not attacking, who cares
-		}
+		*cmd = self.modify_cmd(ptrs, *cmd);
 		
-		let maybe_target = self.find_target(ptrs, &cmd.viewangles);
-		let predicted_target = self.predict(ptrs, maybe_target);
-		match predicted_target {
-			Some(target) => {
-				self.aim_at_target(ptrs, cmd, target);
-			},
-			None => { // nothing to aim at
-				if self.stop_firing != 0 {
-					cmd.buttons &= (!sdk::IN_ATTACK)
-				}
-			} 
-		}
+		let thistick = cmd.tick_count;
+		cmd.tick_count = self.lasttick;
+		self.lasttick = thistick;
+		
 	}
-
-	
 
 	
 	fn enable(&mut self) { self.enabled = true; }

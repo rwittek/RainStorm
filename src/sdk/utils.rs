@@ -22,8 +22,12 @@ pub fn get_local_player_entity(ptrs: &GamePointers) -> raw::C_BaseEntityPtr {
 	let localplayer_entidx = ptrs.ivengineclient.get_local_player();
 	ptrs.icliententitylist.get_client_entity(localplayer_entidx).expect("Local player entity not found!")
 }
-	
-pub fn trace_to_entity(ptrs: &GamePointers, viewangles: &QAngle) -> Option<(raw::C_BaseEntityPtr, i32)> {
+
+pub fn trace_to_entity_hitbox(ptrs: &GamePointers, viewangles: &QAngle) -> Option<(raw::C_BaseEntityPtr, i32)> {
+	trace_to_entity(ptrs, viewangles, 0x4200400B)
+}
+
+pub fn trace_to_entity(ptrs: &GamePointers, viewangles: &QAngle, mask: u32) -> Option<(raw::C_BaseEntityPtr, i32)> {
 	let me = get_local_player_entity(ptrs);
 	let mut trace = unsafe { trace_t::new() };
 	//let filter = sdk::create_tracefilter_from_predicate(should_hit_entity);
@@ -42,8 +46,8 @@ pub fn trace_to_entity(ptrs: &GamePointers, viewangles: &QAngle) -> Option<(raw:
 	let trace_direction = direction.scale( 8192.0f32 ) + eyes;
 	
 	let ray = Ray_t::new(&eyes, &trace_direction);
-
-	ptrs.ienginetrace.trace_ray(&ray, 0x200400B, Some(get_tracefilter(me)), &mut trace);
+	
+	ptrs.ienginetrace.trace_ray(&ray, mask, Some(get_tracefilter(me)), &mut trace);
 	
 	if trace.base.allsolid  {
 		None
@@ -105,7 +109,7 @@ pub struct HitboxPositionIterator<EntType> {
 }
 impl<EntType: Animating> HitboxPositionIterator<EntType> {
 	pub fn new(ent: EntType, modelinfo: sdk::IVModelInfo) -> HitboxPositionIterator<EntType> {
-		HitboxPositionIterator { ent: ent, modelinfo: modelinfo, current_hitbox: 0, num_hitboxes: ent.get_num_hitboxes(modelinfo) }
+		HitboxPositionIterator { ent: ent, modelinfo: modelinfo, current_hitbox: 0, num_hitboxes: ent.get_num_hitboxes(modelinfo) - 1 }
 	}
 }
 impl<EntType: Animating> Iterator<sdk::Vector> for HitboxPositionIterator<EntType> {
