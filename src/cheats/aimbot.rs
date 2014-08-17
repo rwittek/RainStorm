@@ -201,7 +201,7 @@ impl Aimbot {
 		use cmath;
 		
 		let me = utils::get_local_player_entity(ptrs);
-
+		
 		let mut eyes = me.get_origin();
 		
 		unsafe {
@@ -253,42 +253,7 @@ impl Aimbot {
 			}
 		}
 	}
-	fn predict(&mut self, ptrs: &GamePointers, tick: i32, interpdata: Option<(i32, sdk::Vector)>) -> Option<sdk::Vector> {
-		//let currtime = ptrs.ivengineclient.time();
-		
-		let me = utils::get_local_player_entity(ptrs);
 
-		let mut myeyes = me.get_origin();
-		
-		unsafe {
-			let eye_offsets: [f32, ..3] = *(me.ptr_offset(0xF8));
-			//myeyes.x += (eye_offsets)[0];
-			//myeyes.y += (eye_offsets)[1];
-			myeyes.z += (eye_offsets)[2];
-		}
-		
-		let interpdata_record = self.interpdata;
-		self.interpdata = interpdata.map(|(targent, targpos)| (targent, tick, targpos, myeyes));
-		
-		match interpdata {
-			Some((entidx, aim)) => {
-				match interpdata_record {
-					Some((lastent, lasttick, lastaim, lastmyeyes)) if lastent == entidx => {
-						let tick_delta = tick - lasttick;
-						let foo = 1.0 / (tick_delta as f32);
-						let vel = (aim - lastaim).scale(foo);
-						let myvel = (myeyes - lastmyeyes).scale(foo);
-						
-						Some(aim + (vel - myvel)) // this is sometimes wrong, since cmdrate != framerate
-					},
-					_ => { // invalid interpdata
-						None
-					}
-				}
-			},
-			None => None
-		}
-	}
 	fn modify_cmd(&mut self, ptrs: &GamePointers, mut cmd: sdk::CUserCmd) -> sdk::CUserCmd {
 		let maybe_target = self.find_target(ptrs, &cmd.viewangles);
 		let predicted_target = maybe_target.map(|(hb, pos)| pos); // self.predict(ptrs, cmd.tick_count, maybe_target);
@@ -334,13 +299,10 @@ impl Cheat for Aimbot {
 		if !self.enabled {
 			return;
 		}
-		
+		utils::predict(ptrs, cmd);
 		*cmd = self.modify_cmd(ptrs, *cmd);
 		
-		let thistick = cmd.tick_count;
-		cmd.tick_count = self.lasttick;
-		self.lasttick = thistick;
-		
+		cmd.tick_count -= 1;
 	}
 
 	

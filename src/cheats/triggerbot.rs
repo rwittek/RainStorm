@@ -23,10 +23,16 @@ impl Cheat for Triggerbot {
 		if !self.enabled {
 			return;
 		}
+		let me: TFPlayer = unsafe { Entity::from_ptr( utils::get_local_player_entity(ptrs)) };
+		
+		let old_buttons = cmd.buttons;
+		cmd.buttons = cmd.buttons & !1;
+		utils::predict(ptrs, cmd);
+		cmd.buttons = old_buttons;
 		
 		// button 1 = IN_ATTACK
 		if cmd.buttons & 1 == 1 {
-			cmd.buttons = !((!cmd.buttons) | 1); // zero the IN_ATTACK bit
+			cmd.buttons &= !1; // zero the IN_ATTACK bit
 
 			let trace = sdk::utils::trace_to_entity_hitbox(ptrs, &cmd.viewangles);
 			match trace {
@@ -34,7 +40,7 @@ impl Cheat for Triggerbot {
 					let ent: TFPlayer = unsafe { Entity::from_ptr(ent.get_ptr()) };
 					let me: TFPlayer = unsafe { Entity::from_ptr( utils::get_local_player_entity(ptrs)) };
 					
-					if me.get_team() == ent.get_team() {
+					if hitbox == 0 && me.get_team() != ent.get_team() {
 						self.smoothing_state += 1;
 						if self.smoothing_state > self.smoothing {
 							cmd.buttons = cmd.buttons | 1; // set IN_ATTACK

@@ -1,6 +1,6 @@
 use libc;
 use core::prelude::*;
-use super::{trace_t, Ray_t, Vector, QAngle, CBaseHandle};
+use super::{trace_t, Ray_t, Vector, QAngle, CBaseHandle, CUserCmd};
 use CString;
 use core;
 
@@ -55,6 +55,7 @@ ptr_wrapper!(INetChannelPtr)
 ptr_wrapper!(INetMessagePtr)
 ptr_wrapper!(ITraceFilterPtr)
 ptr_wrapper!(IUniformRandomStreamPtr)
+ptr_wrapper!(IPredictionPtr)
 
 extern "C" {
 	pub fn getptr_ivengineclient() -> IVEngineClientPtr; // MAYBE NULL
@@ -76,6 +77,8 @@ extern "C" {
 	
 	pub fn getptr_ibaseclientdll() -> IBaseClientDLLPtr; // MAYBE NULL
 	pub fn getptr_icvar(app_sys_factory: AppSysFactoryPtr) -> ICvarPtr;
+	pub fn getptr_iprediction() -> IPredictionPtr;
+	pub fn iprediction_runcommand(pred: IPredictionPtr, player: C_BaseEntityPtr, cmd: &CUserCmd);
 	
 	pub fn getptr_iuniformrandomstream() -> IUniformRandomStreamPtr;
 	pub fn iuniformrandomstream_set_seed(stream: IUniformRandomStreamPtr, seed: libc::c_int);
@@ -118,6 +121,7 @@ extern "C" {
 	pub fn get_netchannel_senddatagram_trampoline() -> *const ();
 	pub fn get_hooked_getusercmd() -> *const ();
 	pub fn get_hooked_servercmdkeyvalues() -> *const ();
+	pub fn get_hooked_runcommand() -> *const ();
 	pub fn ismousedown() -> bool;
 	pub fn get_critbucket_contents(ent: C_BaseEntityPtr) -> libc::c_float;
 	pub fn calc_seed_from_command_number(cmdnum: libc::c_int) -> libc::c_int;

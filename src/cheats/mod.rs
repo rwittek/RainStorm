@@ -17,6 +17,7 @@ pub mod crithack;
 pub mod bhop;
 pub mod condremover;
 pub mod spinbot;
+pub mod chatspam;
 
 pub static mut CHEAT_MANAGER: *mut CheatManager = 0 as *mut CheatManager;
 
@@ -79,6 +80,8 @@ impl CheatManager {
 		let bhop: Box<bhop::Bunnyhop> = box Cheat::new();
 		let condremover: Box<condremover::CondRemover> = box Cheat::new();
 		let spinbot: Box<spinbot::Spinbot> = box Cheat::new();
+		let chatspam: Box<chatspam::ChatSpam> = box Cheat::new();
+		
 		log!("Creating CheatManager...\n");
 		let mut mgr = CheatManager { 
 			cheats: Vec::new(),
@@ -97,6 +100,7 @@ impl CheatManager {
 		mgr.cheats.push(bhop);
 		mgr.cheats.push(spinbot);
 		mgr.cheats.push(condremover);
+		mgr.cheats.push(chatspam);
 		mgr
 	}
 	pub fn handle_command(&mut self, command: &str, arguments: &[&str]) {
@@ -130,10 +134,11 @@ impl CheatManager {
 		}
 	}
 	// Wrappers that run all the cheats' methods
-	pub unsafe fn preinit(&mut self, appsysfactory: sdk::AppSysFactoryPtr) {
+	pub unsafe fn preinit(&mut self, appsysfactory: sdk::AppSysFactoryPtr, globals: *mut sdk::CGlobalVarsBase) {
 		self.ptrs.appsysfactory = Some(sdk::AppSysFactory::from_ptr(appsysfactory));
 		
 		self.ptrs.icvar = Some( sdk::get_icvar(&self.ptrs.appsysfactory.unwrap()) );
+		self.ptrs.globals = Some(globals);
 		
 		for cheat in self.cheats.mut_iter() {
 			cheat.preinit(&self.ptrs);

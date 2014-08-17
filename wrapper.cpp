@@ -297,6 +297,179 @@ public:
 	CUserCmd	m_cmd;
 	CRC32_t		m_crc;
 };
+
+class CMoveData
+{
+public:
+	bool			m_bFirstRunOfFunctions : 1;
+	bool			m_bGameCodeMovedPlayer : 1;
+
+	EntityHandle_t	m_nPlayerHandle;	// edict index on server, client entity handle on client
+
+	int				m_nImpulseCommand;	// Impulse command issued.
+	QAngle			m_vecViewAngles;	// Command view angles (local space)
+	QAngle			m_vecAbsViewAngles;	// Command view angles (world space)
+	int				m_nButtons;			// Attack buttons.
+	int				m_nOldButtons;		// From host_client->oldbuttons;
+	float			m_flForwardMove;
+	float			m_flSideMove;
+	float			m_flUpMove;
+	
+	float			m_flMaxSpeed;
+	float			m_flClientMaxSpeed;
+
+	// Variables from the player edict (sv_player) or entvars on the client.
+	// These are copied in here before calling and copied out after calling.
+	Vector			m_vecVelocity;		// edict::velocity		// Current movement direction.
+	QAngle			m_vecAngles;		// edict::angles
+	QAngle			m_vecOldAngles;
+	
+// Output only
+	float			m_outStepHeight;	// how much you climbed this move
+	Vector			m_outWishVel;		// This is where you tried 
+	Vector			m_outJumpVel;		// This is your jump velocity
+
+	// Movement constraints	(radius 0 means no constraint)
+	Vector			m_vecConstraintCenter;
+	float			m_flConstraintRadius;
+	float			m_flConstraintWidth;
+	float			m_flConstraintSpeedFactor;
+
+	void			SetAbsOrigin( const Vector &vec );
+	const Vector	&GetAbsOrigin() const;
+
+private:
+	Vector			m_vecAbsOrigin;		// edict::origin
+};
+
+inline const Vector &CMoveData::GetAbsOrigin() const
+{
+	return m_vecAbsOrigin;
+}
+
+class CPrediction : public IPrediction
+{
+// Construction
+public:
+	DECLARE_CLASS_GAMEROOT( CPrediction, IPrediction );
+
+					CPrediction( void );
+	virtual			~CPrediction( void );
+
+	virtual void	Init( void );
+	virtual void	Shutdown( void );
+
+// Implement IPrediction
+public:
+
+	virtual void	Update
+					( 
+						int startframe,		// World update ( un-modded ) most recently received
+						bool validframe,		// Is frame data valid
+						int incoming_acknowledged, // Last command acknowledged to have been run by server (un-modded)
+						int outgoing_command	// Last command (most recent) sent to server (un-modded)
+					);
+
+	virtual void	OnReceivedUncompressedPacket( void );
+
+	virtual void	PreEntityPacketReceived( int commands_acknowledged, int current_world_update_packet );
+	virtual void	PostEntityPacketReceived( void );
+	virtual void	PostNetworkDataReceived( int commands_acknowledged );
+
+	virtual bool	InPrediction( void ) const;
+	virtual bool	IsFirstTimePredicted( void ) const;
+
+#if !defined( NO_ENTITY_PREDICTION )
+	virtual int		GetIncomingPacketNumber( void ) const;
+#endif
+
+	float			GetIdealPitch( void ) const 
+	{
+		return m_flIdealPitch;
+	}
+
+	// The engine needs to be able to access a few predicted values
+	virtual void	GetViewOrigin( Vector& org );
+	virtual void	SetViewOrigin( Vector& org );
+	virtual void	GetViewAngles( QAngle& ang );
+	virtual void	SetViewAngles( QAngle& ang );
+
+	virtual void	GetLocalViewAngles( QAngle& ang );
+	virtual void	SetLocalViewAngles( QAngle& ang );
+
+	virtual void	RunCommand( C_BasePlayer *player, CUserCmd *ucmd, IMoveHelper *moveHelper );
+
+// Internal
+protected:
+	virtual void	SetupMove( C_BasePlayer *player, CUserCmd *ucmd, IMoveHelper *pHelper, CMoveData *move );
+	virtual void	FinishMove( C_BasePlayer *player, CUserCmd *ucmd, CMoveData *move );
+	virtual void	SetIdealPitch ( C_BasePlayer *player, const Vector& origin, const QAngle& angles, const Vector& viewheight );
+
+	void			CheckError( int commands_acknowledged );
+
+	// Called before and after any movement processing
+	void			StartCommand( C_BasePlayer *player, CUserCmd *cmd );
+	void			FinishCommand( C_BasePlayer *player );
+
+	// Helpers to call pre and post think for player, and to call think if a think function is set
+	void			RunPreThink( C_BasePlayer *player );
+	void			RunThink (C_BasePlayer *ent, double frametime );
+	void			RunPostThink( C_BasePlayer *player );
+
+private:
+	virtual void	_Update
+					( 
+						bool received_new_world_update,
+						bool validframe,		// Is frame data valid
+						int incoming_acknowledged, // Last command acknowledged to have been run by server (un-modded)
+						int outgoing_command	// Last command (most recent) sent to server (un-modded)
+					);
+
+	// Actually does the prediction work, returns false if an error occurred
+	bool			PerformPrediction( bool received_new_world_update, C_BasePlayer *localPlayer, int incoming_acknowledged, int outgoing_command );
+
+	void			ShiftIntermediateDataForward( int slots_to_remove, int previous_last_slot );
+	void			RestoreEntityToPredictedFrame( int predicted_frame );
+	int				ComputeFirstCommandToExecute( bool received_new_world_update, int incoming_acknowledged, int outgoing_command );
+
+	void			DumpEntity( C_BaseEntity *ent, int commands_acknowledged );
+
+	void			ShutdownPredictables( void );
+	void			ReinitPredictables( void );
+
+	void			RemoveStalePredictedEntities( int last_command_packet );
+	void			RestoreOriginalEntityState( void );
+	void			RunSimulation( int current_command, float curtime, CUserCmd *cmd, C_BasePlayer *localPlayer );
+	void			Untouch( void );
+	void			StorePredictionResults( int predicted_frame );
+	bool			ShouldDumpEntity( C_BaseEntity *ent );
+
+	void			SmoothViewOnMovingPlatform( C_BasePlayer *pPlayer, Vector& offset );
+
+#if !defined( NO_ENTITY_PREDICTION )
+// Data
+protected:
+	// Last object the player was standing on
+	CHandle< C_BaseEntity > m_hLastGround;
+private:
+	bool			m_bInPrediction;
+	bool			m_bFirstTimePredicted;
+	bool			m_bOldCLPredictValue;
+	bool			m_bEnginePaused;
+
+	// Last network origin for local player
+	int				m_nPreviousStartFrame;
+
+	int				m_nCommandsPredicted;
+	int				m_nServerCommandsAcknowledged;
+	int				m_bPreviousAckHadErrors;
+	int				m_nIncomingPacketNumber;
+
+#endif
+	float			m_flIdealPitch;
+
+};
+
 //========= Copyright Valve Corporation, All rights reserved. ============//
 //
 // Purpose: Generic CRC functions
@@ -506,11 +679,13 @@ DWORD dwFindPattern ( DWORD dwAddress, DWORD dwSize, BYTE* pbMask, char* szMask 
 extern "C" CInput *CINPUT_PTR;
 extern "C" bool NOCMD_ENABLED;
 IClientEntityList *ENTLISTPTR;
+IMoveHelper *MOVEHELPER = NULL;
 extern "C" int ( __stdcall *REAL_INIT)( CreateInterfaceFn appSysFactory, CreateInterfaceFn physicsFactory, CGlobalVarsBase* pGlobals );
 extern "C" void (__stdcall *REAL_CREATEMOVE)( int sequence_number, float input_sample_frametime, bool active );
 extern "C" void (__stdcall *REAL_EXTRAMOUSESAMPLE)( float input_sample_frametime, bool active );
 extern "C" void (__fastcall *REAL_SERVERCMDKEYVALUES)( IVEngineClient *_this, int edx, KeyValues *kv );
 extern "C" bool (__fastcall *REAL_NETCHANNEL_SENDDATAGRAM)(INetChannel *chan, int ignoreme, bf_write *data);
+extern "C" void (__fastcall *REAL_RUNCOMMAND)(IPrediction *pred, int ignoreme, CUserCmd *ucmd, IMoveHelper *helper);
 bool (__fastcall *COPIED_NETCHANNEL_SENDDATAGRAM)(INetChannel *chan, int ignoreme, bf_write *data) = NULL;
 extern "C" void rainstorm_preinithook( CreateInterfaceFn appSysFactory, CreateInterfaceFn physicsFactory, CGlobalVarsBase* pGlobals );
 extern "C" void rainstorm_postinithook();
@@ -528,6 +703,16 @@ void __stdcall hooked_servercmdkeyvalues( KeyValues *kv ) {
 }
 extern "C" void *get_hooked_servercmdkeyvalues() {
 	return &hooked_servercmdkeyvalues;
+}
+
+void __fastcall hooked_runcommand(IPrediction *pred, int ignoreme, CUserCmd *ucmd, IMoveHelper *helper) {
+	MOVEHELPER = helper;
+	if (REAL_RUNCOMMAND) {
+		REAL_RUNCOMMAND(pred, ignoreme, ucmd, helper);
+	}
+}
+extern "C" void *get_hooked_runcommand() {
+	return &hooked_runcommand;
 }
 int __stdcall hooked_init_trampoline( CreateInterfaceFn appSysFactory, CreateInterfaceFn physicsFactory, CGlobalVarsBase* pGlobals ) {
 	globals_ptr = pGlobals;
@@ -615,6 +800,7 @@ extern "C" ICvar * getptr_icvar(CreateInterfaceFn unused) {
 	ptr->RegisterConCommand((ConCommandBase *)&rainstorm_command);
 	return ptr;
 }
+
 extern "C" float get_current_latency(IVEngineClient *engine) {
 	float netlag = get_current_inetchannel(engine)->GetLatency(0);
 	return netlag;
@@ -670,6 +856,21 @@ extern "C" IClientEntityList * getptr_icliententitylist () {
 	if (ClientFactory == NULL) setup_clientfactory();
 	return (IClientEntityList*) ClientFactory ( VCLIENTENTITYLIST_INTERFACE_VERSION, NULL );
 }
+
+extern "C" IPrediction * getptr_iprediction () {
+	if (ClientFactory == NULL) setup_clientfactory();
+	return (IPrediction*) ClientFactory ( VCLIENT_PREDICTION_INTERFACE_VERSION, NULL );
+}
+
+extern "C" void iprediction_runcommand(CPrediction *pred, C_BasePlayer *player, CUserCmd *ucmd) {
+
+	// fix netvars
+	auto old_tick = player->m_nTickBase;
+	pred->RunCommand(player, ucmd, MOVEHELPER);
+	player->m_nTickBase = old_tick;
+	memcpy(&player->m_angNetworkAngles, &player->GetAbsAngles(), sizeof(QAngle));
+}
+
 CUniformRandomStream GlobalStream;
 
 extern "C" IUniformRandomStream * getptr_iuniformrandomstream () {
@@ -813,6 +1014,10 @@ extern "C" IClientEntity *icliententitylist_getcliententityfromhandle(IClientEnt
 extern "C" Vector c_baseentity_getorigin(C_BaseEntity *ent) {
 	return ent->GetAbsOrigin();
 }
+
+extern "C" QAngle c_baseentity_getnetangles(C_BaseEntity *ent) {
+	return ent->m_angNetworkAngles;
+}
 extern "C" Vector c_baseentity_worldspacecenter(C_BaseEntity *ent) {
 	return ent->WorldSpaceCenter();
 }
@@ -873,7 +1078,6 @@ void get_hitbox_position(C_BaseAnimating *ent, IVModelInfo *modelinfo, int hitbo
 	VectorTransform(bbmin, bonetoworld[bone], bbmin_world);
 	
 	origin = (bbmax_world + bbmin_world)/2.0;
-	globals_ptr->curtime -= 1.0/66.0;
 }
 
 extern "C" void c_baseanimating_gethitboxposition(C_BaseAnimating *ent, IVModelInfo *modelinfo, int iHitbox, Vector &origin ) {

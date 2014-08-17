@@ -77,6 +77,8 @@ pub static mut REAL_CREATEMOVE: *const () = 0 as *const ();
 #[no_mangle]
 pub static mut REAL_EXTRAMOUSESAMPLE: *const () = 0 as *const ();
 #[no_mangle]
+pub static mut REAL_RUNCOMMAND: *const () = 0 as *const ();
+#[no_mangle]
 pub static mut REAL_SERVERCMDKEYVALUES: *const () = 0 as *const ();
 #[no_mangle]
 pub static mut REAL_NETCHANNEL_SENDDATAGRAM: *const () = 0 as *const ();
@@ -111,7 +113,8 @@ pub struct GamePointers {
 	appsysfactory: Option<sdk::AppSysFactory>,
 	ivmodelinfo: sdk::IVModelInfo,
 	icvar: Option<sdk::ICvar>,
-	iuniformrandomstream: sdk::IUniformRandomStream
+	iuniformrandomstream: sdk::IUniformRandomStream,
+	globals: Option<*mut sdk::CGlobalVarsBase>
 }
 
 impl GamePointers {
@@ -125,7 +128,8 @@ impl GamePointers {
 			ivmodelinfo: sdk::get_ivmodelinfo(),
 			appsysfactory: None,
 			icvar: None,
-			iuniformrandomstream: sdk::get_iuniformrandomstream()
+			iuniformrandomstream: sdk::get_iuniformrandomstream(),
+			globals: None
 		}
 	}
 }
@@ -153,11 +157,11 @@ pub unsafe fn locate_cinput() -> Option<*mut sdk::CInput> {
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn rainstorm_preinithook(app_sys_factory: sdk::AppSysFactoryPtr, _physics_factory: *mut (), _globals: *mut ()) {
+pub unsafe extern "C" fn rainstorm_preinithook(app_sys_factory: sdk::AppSysFactoryPtr, _physics_factory: *mut (), globals: *mut sdk::CGlobalVarsBase) {
 	log!("pre-init hook running\n");
 
 	if cheats::CHEAT_MANAGER.is_not_null() {
-		(*cheats::CHEAT_MANAGER).preinit(app_sys_factory);
+		(*cheats::CHEAT_MANAGER).preinit(app_sys_factory, globals);
 	} else {
 		quit!("Cheat manager not found!\n");
 	};
@@ -220,7 +224,7 @@ pub extern "C" fn rainstorm_command_cb(c_arguments: *const libc::c_char) {
 
 #[no_mangle]
 pub extern "C" fn rainstorm_init(log_fd: libc::c_int, hooked_init_trampoline: *const (), hooked_createmove_trampoline: *const (),
-		hooked_extramousesample_trampoline: *const ()) {
+		hooked_extramousesample_trampoline: *const (), hooked_runcommand_trampoline: *const ()) {
 	unsafe { let _ = logging::set_fd(log_fd).unwrap(); }
 	log!("Rainstorm starting up!\n");
 
@@ -231,7 +235,7 @@ pub extern "C" fn rainstorm_init(log_fd: libc::c_int, hooked_init_trampoline: *c
 		REAL_INIT = ibaseclientdll_hooker.get_orig_method(0);
 		REAL_CREATEMOVE = ibaseclientdll_hooker.get_orig_method(21);
 		REAL_EXTRAMOUSESAMPLE = ibaseclientdll_hooker.get_orig_method(22);
-		
+
 		ibaseclientdll_hooker.hook(0, hooked_init_trampoline);
 		ibaseclientdll_hooker.hook(21, hooked_createmove_trampoline);
 		ibaseclientdll_hooker.hook(22, hooked_extramousesample_trampoline);
@@ -243,7 +247,11 @@ pub extern "C" fn rainstorm_init(log_fd: libc::c_int, hooked_init_trampoline: *c
 
 		CINPUT_PTR = locate_cinput().expect("Failed to locate CInput pointer (signature not found)");
 		let mut hooker = vmthook::VMTHooker::new(CINPUT_PTR as *mut *const ());
-		hooker.hook(8, sdk::get_hooked_getusercmd())
+		hooker.hook(8, sdk::get_hooked_getusercmd());
+	
+		let mut iprediction_hooker = vmthook::VMTHooker::new(sdk::raw::getptr_iprediction().to_uint() as *mut *const ());
+		REAL_RUNCOMMAND = hooker.get_orig_method(18);
+		hooker.hook(18, sdk::raw::get_hooked_runcommand());
 	};
 }
 

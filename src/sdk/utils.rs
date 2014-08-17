@@ -22,6 +22,21 @@ pub fn get_local_player_entity(ptrs: &GamePointers) -> raw::C_BaseEntityPtr {
 	let localplayer_entidx = ptrs.ivengineclient.get_local_player();
 	ptrs.icliententitylist.get_client_entity(localplayer_entidx).expect("Local player entity not found!")
 }
+pub fn predict(ptrs: &GamePointers, cmd: &super::CUserCmd) { 
+	let mut me = get_local_player_entity(ptrs);
+	let mut tempcmd = *cmd;
+	tempcmd.buttons = cmd.buttons & !sdk::IN_ATTACK;
+	match ptrs.globals {
+		Some(globals) => {
+			unsafe {
+				let flags: u32 = *me.ptr_offset(0x0378);
+				sdk::IPrediction::from_ptr(sdk::raw::getptr_iprediction()).run_command(Entity::from_ptr(me), &tempcmd);
+				*me.mut_ptr_offset(0x0378) = flags;
+			}
+		},
+		None => ()
+	}
+}
 
 pub fn trace_to_entity_hitbox(ptrs: &GamePointers, viewangles: &QAngle) -> Option<(raw::C_BaseEntityPtr, i32)> {
 	trace_to_entity(ptrs, viewangles, 0x4200400B)
