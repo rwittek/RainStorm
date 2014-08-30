@@ -1,8 +1,9 @@
+use core::prelude::*;
 use Cheat;
 use GamePointers;
 use sdk;
 use sdk::Entity;
-
+use sdk::utils;
 pub struct Spinbot {
 	enabled: bool,
 	
@@ -22,13 +23,20 @@ impl Cheat for Spinbot {
 			return;
 		}
 		
-		self.currangle = (self.currangle + 10.0)%360.0;
+		self.currangle = (self.currangle + 20.0)%360.0;
 		
-		if cmd.buttons & sdk::IN_ATTACK != 0 {
-			return;
+		let me = utils::get_local_player_entity(ptrs);
+		
+		unsafe { 
+			if cmd.buttons & sdk::IN_ATTACK != 0 {
+				if sdk::raw::c_baseplayer_isattacking(me) {
+					return;
+				} else {
+					cmd.buttons &= !sdk::IN_ATTACK;
+				}
+			}
 		}
 		
-
 		let oldviewangles = cmd.viewangles;
 		
 		cmd.viewangles.yaw = self.currangle;

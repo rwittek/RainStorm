@@ -15,5 +15,7 @@ impl Cheat for CvarUnlocker {
 		let icvar = ptrs.icvar.unwrap();
 		let mut sv_cheats = icvar.find_var("sv_cheats").expect("sv_cheats cvar not found?");
 		unsafe { sv_cheats.setvalue_raw(sdk::Int(1)); log!("sv_cheats set to 1 OK\n") };
+		let mut bananer = icvar.find_var("tf_forced_holiday").expect("sv_cheats cvar not found?");
+		unsafe { bananer.setvalue_raw(sdk::Int(1)); log!("happy bday set to 1 OK\n") };
 	}
 }

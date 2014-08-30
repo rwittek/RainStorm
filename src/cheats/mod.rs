@@ -18,7 +18,7 @@ pub mod bhop;
 pub mod condremover;
 pub mod spinbot;
 pub mod chatspam;
-
+pub mod esp;
 pub static mut CHEAT_MANAGER: *mut CheatManager = 0 as *mut CheatManager;
 
 pub fn cheatmgr_setup() {
@@ -81,7 +81,7 @@ impl CheatManager {
 		let condremover: Box<condremover::CondRemover> = box Cheat::new();
 		let spinbot: Box<spinbot::Spinbot> = box Cheat::new();
 		let chatspam: Box<chatspam::ChatSpam> = box Cheat::new();
-		
+		let esp: Box<esp::ESP> = box Cheat::new();
 		log!("Creating CheatManager...\n");
 		let mut mgr = CheatManager { 
 			cheats: Vec::new(),
@@ -101,6 +101,7 @@ impl CheatManager {
 		mgr.cheats.push(spinbot);
 		mgr.cheats.push(condremover);
 		mgr.cheats.push(chatspam);
+		mgr.cheats.push(esp);
 		mgr
 	}
 	pub fn handle_command(&mut self, command: &str, arguments: &[&str]) {
@@ -127,6 +128,14 @@ impl CheatManager {
 					None => log!("Could not find any cheats named {}\n", cheat_name) // cheat not found
 				}
 			},
+			"fakelag" => {
+				unsafe {
+					sdk::raw::FAKELAG = ::utils::str_to_integral::<u32>(arguments[0]);
+				}
+			},
+			"disconnect" => {
+				unsafe { sdk::raw::inetchannel_disconnect(sdk::raw::get_current_inetchannel(self.ptrs.ivengineclient.get_ptr()), ::CString::new(b"boner\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\0").unwrap()) }
+			}
 			_ => {
 				log!("Unrecognized command {}\n", {});
 				// unrecognized

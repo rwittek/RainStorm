@@ -16,6 +16,9 @@ pub trait Entity: core::kinds::Copy {
 	fn get_velocity(&self) -> Vector {
 		unsafe { raw::c_baseentity_getvelocity(self.get_ptr()) }
 	}
+	fn interpolate(&self, time: f32) {
+		unsafe { raw::c_baseentity_interpolate(self.get_ptr(), time) }
+	}
 	fn get_index(&self) -> i32 {
 		unsafe { raw::c_baseentity_getindex(self.get_ptr()) }
 	}
@@ -125,7 +128,7 @@ impl Entity for TFPlayer {
 	}
 }
 impl Animating for TFPlayer {}
-impl OnTeam for TFPlayer {
+impl<T: Entity> OnTeam for T {
 	fn get_team(&self) -> u32 {
 		unsafe {*(self.ptr_offset(0x00AC))}
 	}
@@ -145,9 +148,9 @@ impl Entity for BaseObject {
 	}
 }
 impl Animating for BaseObject {}
-impl OnTeam for BaseObject {
+/*impl OnTeam for BaseObject {
 	fn get_team(&self) -> u32 {
 		unsafe {*(self.ptr_offset(0x00AC))}
 	}
-}
+}*/
 impl Object for BaseObject {}

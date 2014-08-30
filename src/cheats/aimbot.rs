@@ -62,9 +62,9 @@ impl Aimbot {
 
 	/// Find the best thing to shoot at... if there is one.
 	/// Otherwise, returns None.
-	fn find_target(&mut self, ptrs: &GamePointers, viewangles: &sdk::QAngle) -> Option<(i32, sdk::Vector)> {
+	fn find_target(&mut self, ptrs: &GamePointers, viewangles: &sdk::QAngle, time: f32) -> Option<(i32, sdk::Vector)> {
 		let me: TFPlayer = unsafe { Entity::from_ptr( utils::get_local_player_entity(ptrs)) };
-
+		
 		let mut eyes = me.get_origin();
 		
 		unsafe {
@@ -83,7 +83,6 @@ impl Aimbot {
 				let aimvec = pos - eyes;
 				let tempangles = aimvec.to_angle();
 				
-				// can we actually see this?
 				match sdk::utils::trace_to_entity(ptrs, &tempangles, 0x200400B) {
 					Some((trace_ent, hit_hitbox)) if trace_ent.get_index() == ent.get_index() => {
 						match hitbox {
@@ -167,12 +166,14 @@ impl Aimbot {
 						let mut player: sdk::TFPlayer = unsafe {
 							Entity::from_ptr(ent.get_ptr())
 						};
+						log!("Interpolating... ");
+						player.interpolate(0.0);
+						log!("OK.\n");
 						match self.hitbox {
 							Some(hitbox) => {
 								
-								let mut hitbox_pos = player.get_hitbox_position(ptrs.ivmodelinfo, hitbox);
-								hitbox_pos = hitbox_pos;
-								prioritize(hitbox_pos, &ent as &Entity, Some(hitbox), targtype)
+								let hitbox_pos = player.get_hitbox_position(ptrs.ivmodelinfo, hitbox);
+								prioritize(hitbox_pos, &ent as &Entity, None, targtype)
 							},
 							None => {
 								for hitbox_pos in sdk::utils::HitboxPositionIterator::new(player, ptrs.ivmodelinfo) {
@@ -255,7 +256,7 @@ impl Aimbot {
 	}
 
 	fn modify_cmd(&mut self, ptrs: &GamePointers, mut cmd: sdk::CUserCmd) -> sdk::CUserCmd {
-		let maybe_target = self.find_target(ptrs, &cmd.viewangles);
+		let maybe_target = self.find_target(ptrs, &cmd.viewangles, cmd.tick_count as f32 / 66.0);
 		let predicted_target = maybe_target.map(|(hb, pos)| pos); // self.predict(ptrs, cmd.tick_count, maybe_target);
 		self.aim_at_target(ptrs, &mut cmd, predicted_target);
 		match predicted_target {
@@ -299,10 +300,11 @@ impl Cheat for Aimbot {
 		if !self.enabled {
 			return;
 		}
+		let me: TFPlayer = unsafe { Entity::from_ptr( utils::get_local_player_entity(ptrs)) };
+		
 		utils::predict(ptrs, cmd);
 		*cmd = self.modify_cmd(ptrs, *cmd);
-		
-		cmd.tick_count -= 1;
+		//ptrs.ivengineclient.set_viewangles(&cmd.viewangles);
 	}
 
 	

@@ -94,6 +94,941 @@
 #include "public\toolframework\IEngineTool.h"
 #include "public\inetchannel.h"
 #include "public\inetmessage.h"
+
+//========= Copyright © 1996-2005, Valve Corporation, All rights reserved. ============//
+//
+// Purpose: 
+//
+// $NoKeywords: $
+//
+//=============================================================================//
+
+#include "bitbuf.h"
+
+
+
+FILE *logfile;
+
+// FIXME: Can't use this until we get multithreaded allocations in tier0 working for tools
+// This is used by VVIS and fails to link
+// NOTE: This must be the last file included!!!
+//#include "tier0/memdbgon.h"
+
+#ifdef _XBOX
+// mandatory ... wary of above comment and isolating, tier0 is built as MT though
+#include "tier0/memdbgon.h"
+#endif
+HMODULE GetModuleHandleSafe( const char* pszModuleName )
+{
+	HMODULE hmModuleHandle = NULL;
+
+	do
+	{
+		hmModuleHandle = GetModuleHandle( pszModuleName );
+		Sleep( 1 );
+	}
+	while(hmModuleHandle == NULL);
+
+	return hmModuleHandle;
+}
+
+
+static BitBufErrorHandler g_BitBufErrorHandler = 0;
+
+
+void InternalBitBufErrorHandler( BitBufErrorType errorType, const char *pDebugName )
+{
+	if ( g_BitBufErrorHandler )
+		g_BitBufErrorHandler( errorType, pDebugName );
+}
+
+
+void SetBitBufErrorHandler( BitBufErrorHandler fn )
+{
+	g_BitBufErrorHandler = fn;
+}
+
+
+// #define BB_PROFILING
+
+
+// Precalculated bit masks for WriteUBitLong. Using these tables instead of 
+// doing the calculations gives a 33% speedup in WriteUBitLong.
+unsigned long g_BitWriteMasks[32][33];
+
+// (1 << i) - 1
+unsigned long g_ExtraMasks[32];
+
+class CBitWriteMasksInit
+{
+public:
+	CBitWriteMasksInit()
+	{
+		for( unsigned int startbit=0; startbit < 32; startbit++ )
+		{
+			for( unsigned int nBitsLeft=0; nBitsLeft < 33; nBitsLeft++ )
+			{
+				unsigned int endbit = startbit + nBitsLeft;
+				g_BitWriteMasks[startbit][nBitsLeft] = (1 << startbit) - 1;
+				if(endbit < 32)
+					g_BitWriteMasks[startbit][nBitsLeft] |= ~((1 << endbit) - 1);
+			}
+		}
+
+		for ( unsigned int maskBit=0; maskBit < 32; maskBit++ )
+			g_ExtraMasks[maskBit] = (1 << maskBit) - 1;
+	}
+};
+CBitWriteMasksInit g_BitWriteMasksInit;
+
+
+// ---------------------------------------------------------------------------------------- //
+// bf_write
+// ---------------------------------------------------------------------------------------- //
+
+bf_write::bf_write()
+{
+	m_pData = NULL;
+	m_nDataBytes = 0;
+	m_nDataBits = -1; // set to -1 so we generate overflow on any operation
+	m_iCurBit = 0;
+	m_bOverflow = false;
+	m_bAssertOnOverflow = true;
+	m_pDebugName = NULL;
+}
+
+bf_write::bf_write( const char *pDebugName, void *pData, int nBytes, int nBits )
+{
+	m_bAssertOnOverflow = true;
+	m_pDebugName = pDebugName;
+	StartWriting( pData, nBytes, 0, nBits );
+}
+
+bf_write::bf_write( void *pData, int nBytes, int nBits )
+{
+	m_bAssertOnOverflow = true;
+	StartWriting( pData, nBytes, 0, nBits );
+}
+
+void bf_write::StartWriting( void *pData, int nBytes, int iStartBit, int nBits )
+{
+	// Make sure it's dword aligned and padded.
+	Assert( (nBytes % 4) == 0 );
+	Assert(((unsigned long)pData & 3) == 0);
+
+	m_pData = (unsigned long*__restrict)pData;
+	m_nDataBytes = nBytes;
+
+	if ( nBits == -1 )
+	{
+		m_nDataBits = nBytes << 3;
+	}
+	else
+	{
+		Assert( nBits <= nBytes*8 );
+		m_nDataBits = nBits;
+	}
+
+	m_iCurBit = iStartBit;
+	m_bOverflow = false;
+}
+
+void bf_write::Reset()
+{
+	m_iCurBit = 0;
+	m_bOverflow = false;
+}
+
+
+void bf_write::SetAssertOnOverflow( bool bAssert )
+{
+	m_bAssertOnOverflow = bAssert;
+}
+
+
+const char* bf_write::GetDebugName()
+{
+	return m_pDebugName;
+}
+
+
+void bf_write::SetDebugName( const char *pDebugName )
+{
+	m_pDebugName = pDebugName;
+}
+
+
+void bf_write::SeekToBit( int bitPos )
+{
+	m_iCurBit = bitPos;
+}
+
+
+// Sign bit comes first
+void bf_write::WriteSBitLong( int data, int numbits )
+{
+	// Do we have a valid # of bits to encode with?
+	Assert( numbits >= 1 );
+
+	// Note: it does this wierdness here so it's bit-compatible with regular integer data in the buffer.
+	// (Some old code writes direct integers right into the buffer).
+	if(data < 0)
+	{
+#ifdef _DEBUG
+	if( numbits < 32 )
+	{
+		// Make sure it doesn't overflow.
+
+		if( data < 0 )
+		{
+			Assert( data >= -(1 << (numbits-1)) );
+		}
+		else
+		{
+			Assert( data < (1 << (numbits-1)) );
+		}
+	}
+#endif
+
+		WriteUBitLong( (unsigned int)(0x80000000 + data), numbits - 1, false );
+		WriteOneBit( 1 );
+	}
+	else
+	{
+		WriteUBitLong((unsigned int)data, numbits - 1);
+		WriteOneBit( 0 );
+	}
+}
+
+void bf_write::WriteBitLong(unsigned int data, int numbits, bool bSigned)
+{
+	if(bSigned)
+		WriteSBitLong((int)data, numbits);
+	else
+		WriteUBitLong(data, numbits);
+}
+
+bool bf_write::WriteBits(const void *pInData, int nBits)
+{
+#if defined( BB_PROFILING )
+	VPROF( "bf_write::WriteBits" );
+#endif
+
+	unsigned char *pOut = (unsigned char*)pInData;
+	int nBitsLeft = nBits;
+
+	
+	// Get output dword-aligned.
+	while(((unsigned long)pOut & 3) != 0 && nBitsLeft >= 8)
+	{
+		WriteUBitLong( *pOut, 8, false );
+		++pOut;
+		nBitsLeft -= 8;
+	}
+	
+	// check if we can use fast memcpy if m_iCurBit is byte aligned
+	if ( (nBitsLeft >= 32) && (m_iCurBit & 7) == 0 )
+	{
+		int numbytes = (nBitsLeft >> 3); 
+		int numbits = numbytes << 3;
+		
+		// Bounds checking..
+		if((m_iCurBit+numbits) > m_nDataBits)
+		{
+			m_iCurBit = m_nDataBits;
+			SetOverflowFlag();
+			CallErrorHandler( BITBUFERROR_BUFFER_OVERRUN, GetDebugName() );
+			return false;
+		}
+		
+		Q_memcpy( m_pData+(m_iCurBit>>3), pOut, numbytes );
+		pOut += numbytes;
+		nBitsLeft -= numbits;
+		m_iCurBit += numbits;
+	}
+
+	// Read dwords.
+	while(nBitsLeft >= 32)
+	{
+		WriteUBitLong( *((unsigned long*)pOut), 32, false );
+		pOut += sizeof(unsigned long);
+		nBitsLeft -= 32;
+	}
+
+	// Read the remaining bytes.
+	while(nBitsLeft >= 8)
+	{
+		WriteUBitLong( *pOut, 8, false );
+		++pOut;
+		nBitsLeft -= 8;
+	}
+	
+	// Read the remaining bits.
+	if(nBitsLeft)
+	{
+		WriteUBitLong( *pOut, nBitsLeft, false );
+	}
+
+	return !IsOverflowed();
+}
+
+
+bool bf_write::WriteBitsFromBuffer( bf_read *pIn, int nBits )
+{
+	// This could be optimized a little by
+	while ( nBits > 32 )
+	{
+		WriteUBitLong( pIn->ReadUBitLong( 32 ), 32 );
+		nBits -= 32;
+	}
+
+	WriteUBitLong( pIn->ReadUBitLong( nBits ), nBits );
+	return !IsOverflowed() && !pIn->IsOverflowed();
+}
+
+
+void bf_write::WriteBitAngle( float fAngle, int numbits )
+{
+	int d;
+	unsigned int mask;
+	unsigned int shift;
+
+	shift = (1<<numbits);
+	mask = shift - 1;
+
+	d = (int)( (fAngle / 360.0) * shift );
+	d &= mask;
+
+	WriteUBitLong((unsigned int)d, numbits);
+}
+/*
+void bf_write::WriteBitCoord (const float f)
+{
+#if defined( BB_PROFILING )
+	VPROF( "bf_write::WriteBitCoord" );
+#endif
+	int		signbit = (f <= -COORD_RESOLUTION);
+	int		intval = (int)abs(f);
+	int		fractval = abs((int)(f*COORD_DENOMINATOR)) & (COORD_DENOMINATOR-1);
+
+
+	// Send the bit flags that indicate whether we have an integer part and/or a fraction part.
+	WriteOneBit( intval );
+	WriteOneBit( fractval );
+
+	if ( intval || fractval )
+	{
+		// Send the sign bit
+		WriteOneBit( signbit );
+
+		// Send the integer if we have one.
+		if ( intval )
+		{
+			// Adjust the integers from [1..MAX_COORD_VALUE] to [0..MAX_COORD_VALUE-1]
+			intval--;
+			WriteUBitLong( (unsigned int)intval, COORD_INTEGER_BITS );
+		}
+		
+		// Send the fraction if we have one
+		if ( fractval )
+		{
+			WriteUBitLong( (unsigned int)fractval, COORD_FRACTIONAL_BITS );
+		}
+	}
+}*/
+
+/*
+void bf_write::WriteBitVec3Coord( const Vector& fa )
+{
+	int		xflag, yflag, zflag;
+
+	xflag = (fa[0] >= COORD_RESOLUTION) || (fa[0] <= -COORD_RESOLUTION);
+	yflag = (fa[1] >= COORD_RESOLUTION) || (fa[1] <= -COORD_RESOLUTION);
+	zflag = (fa[2] >= COORD_RESOLUTION) || (fa[2] <= -COORD_RESOLUTION);
+
+	WriteOneBit( xflag );
+	WriteOneBit( yflag );
+	WriteOneBit( zflag );
+
+	if ( xflag )
+		WriteBitCoord( fa[0] );
+	if ( yflag )
+		WriteBitCoord( fa[1] );
+	if ( zflag )
+		WriteBitCoord( fa[2] );
+}
+
+void bf_write::WriteBitNormal( float f )
+{
+	int	signbit = (f <= -NORMAL_RESOLUTION);
+
+	// NOTE: Since +/-1 are valid values for a normal, I'm going to encode that as all ones
+	unsigned int fractval = abs( (int)(f*NORMAL_DENOMINATOR) );
+
+	// clamp..
+	if (fractval > NORMAL_DENOMINATOR)
+		fractval = NORMAL_DENOMINATOR;
+
+	// Send the sign bit
+	WriteOneBit( signbit );
+
+	// Send the fractional component
+	WriteUBitLong( fractval, NORMAL_FRACTIONAL_BITS );
+}
+
+void bf_write::WriteBitVec3Normal( const Vector& fa )
+{
+	int		xflag, yflag;
+
+	xflag = (fa[0] >= NORMAL_RESOLUTION) || (fa[0] <= -NORMAL_RESOLUTION);
+	yflag = (fa[1] >= NORMAL_RESOLUTION) || (fa[1] <= -NORMAL_RESOLUTION);
+
+	WriteOneBit( xflag );
+	WriteOneBit( yflag );
+
+	if ( xflag )
+		WriteBitNormal( fa[0] );
+	if ( yflag )
+		WriteBitNormal( fa[1] );
+	
+	// Write z sign bit
+	int	signbit = (fa[2] <= -NORMAL_RESOLUTION);
+	WriteOneBit( signbit );
+}
+
+void bf_write::WriteBitAngles( const QAngle& fa )
+{
+	// FIXME:
+	Vector tmp( fa.x, fa.y, fa.z );
+	WriteBitVec3Coord( tmp );
+}*/
+
+void bf_write::WriteChar(int val)
+{
+	WriteSBitLong(val, sizeof(char) << 3);
+}
+
+void bf_write::WriteByte(int val)
+{
+	WriteUBitLong(val, sizeof(unsigned char) << 3);
+}
+
+void bf_write::WriteShort(int val)
+{
+	WriteSBitLong(val, sizeof(short) << 3);
+}
+
+void bf_write::WriteWord(int val)
+{
+	WriteUBitLong(val, sizeof(unsigned short) << 3);
+}
+
+void bf_write::WriteLong(long val)
+{
+	WriteSBitLong(val, sizeof(long) << 3);
+}
+
+void bf_write::WriteFloat(float val)
+{
+	WriteBits(&val, sizeof(val) << 3);
+}
+
+bool bf_write::WriteBytes( const void *pBuf, int nBytes )
+{
+	return WriteBits(pBuf, nBytes << 3);
+}
+
+bool bf_write::WriteString(const char *pStr)
+{
+	if(pStr)
+	{
+		do
+		{
+			WriteChar( *pStr );
+			++pStr;
+		} while( *(pStr-1) != 0 );
+	}
+	else
+	{
+		WriteChar( 0 );
+	}
+
+	return !IsOverflowed();
+}
+void bf_read::SetOverflowFlag() {
+	m_bOverflow = true;
+}
+// ---------------------------------------------------------------------------------------- //
+// bf_read
+// ---------------------------------------------------------------------------------------- //
+/*
+bf_read::bf_read()
+{
+	m_pData = NULL;
+	m_nDataBytes = 0;
+	m_nDataBits = -1; // set to -1 so we overflow on any operation
+	m_iCurBit = 0;
+	m_bOverflow = false;
+	m_bAssertOnOverflow = true;
+	m_pDebugName = NULL;
+}
+
+bf_read::bf_read( const void *pData, int nBytes, int nBits )
+{
+	m_bAssertOnOverflow = true;
+	StartReading( pData, nBytes, 0, nBits );
+}
+
+bf_read::bf_read( const char *pDebugName, const void *pData, int nBytes, int nBits )
+{
+	m_bAssertOnOverflow = true;
+	m_pDebugName = pDebugName;
+	StartReading( pData, nBytes, 0, nBits );
+}
+
+void bf_read::StartReading( const void *pData, int nBytes, int iStartBit, int nBits )
+{
+	// Make sure we're dword aligned.
+	Assert(((unsigned long)pData & 3) == 0);
+
+	m_pData = (unsigned char*)pData;
+	m_nDataBytes = nBytes;
+
+	if ( nBits == -1 )
+	{
+		m_nDataBits = m_nDataBytes << 3;
+	}
+	else
+	{
+		Assert( nBits <= nBytes*8 );
+		m_nDataBits = nBits;
+	}
+
+	m_iCurBit = iStartBit;
+	m_bOverflow = false;
+}
+
+void bf_read::Reset()
+{
+	m_iCurBit = 0;
+	m_bOverflow = false;
+}
+
+void bf_read::SetAssertOnOverflow( bool bAssert )
+{
+	m_bAssertOnOverflow = bAssert;
+}
+
+const char* bf_read::GetDebugName()
+{
+	return m_pDebugName;
+}
+
+void bf_read::SetDebugName( const char *pName )
+{
+	m_pDebugName = pName;
+}
+
+unsigned int bf_read::CheckReadUBitLong(int numbits)
+{
+	// Ok, just read bits out.
+	int i, nBitValue;
+	unsigned int r = 0;
+
+	for(i=0; i < numbits; i++)
+	{
+		nBitValue = ReadOneBitNoCheck();
+		r |= nBitValue << i;
+	}
+	m_iCurBit -= numbits;
+	
+	return r;
+}
+
+bool bf_read::ReadBits(void *pOutData, int nBits)
+{
+#if defined( BB_PROFILING )
+	VPROF( "bf_write::ReadBits" );
+#endif
+
+	unsigned char *pOut = (unsigned char*)pOutData;
+	int nBitsLeft = nBits;
+
+	
+	// Get output dword-aligned.
+	while(((unsigned long)pOut & 3) != 0 && nBitsLeft >= 8)
+	{
+		*pOut = (unsigned char)ReadUBitLong(8);
+		++pOut;
+		nBitsLeft -= 8;
+	}
+
+	// Read dwords.
+	while(nBitsLeft >= 32)
+	{
+		*((unsigned long*)pOut) = ReadUBitLong(32);
+		pOut += sizeof(unsigned long);
+		nBitsLeft -= 32;
+	}
+
+	// Read the remaining bytes.
+	while(nBitsLeft >= 8)
+	{
+		*pOut = ReadUBitLong(8);
+		++pOut;
+		nBitsLeft -= 8;
+	}
+	
+	// Read the remaining bits.
+	if(nBitsLeft)
+	{
+		*pOut = ReadUBitLong(nBitsLeft);
+	}
+
+	return !IsOverflowed();
+}
+
+float bf_read::ReadBitAngle( int numbits )
+{
+	float fReturn;
+	int i;
+	float shift;
+
+	shift = (float)( 1 << numbits );
+
+	i = ReadUBitLong( numbits );
+	fReturn = (float)i * (360.0 / shift);
+
+	return fReturn;
+}
+
+unsigned int bf_read::PeekUBitLong( int numbits )
+{
+	unsigned int r;
+	int i, nBitValue;
+#ifdef BIT_VERBOSE
+	int nShifts = numbits;
+#endif
+
+	bf_read savebf;
+
+	savebf = *this;  // Save current state info
+
+	r = 0;
+	for(i=0; i < numbits; i++)
+	{
+		nBitValue = ReadOneBit();
+
+		// Append to current stream
+		if ( nBitValue )
+		{
+			r |= 1 << i;
+		}
+	}
+	
+	*this = savebf;
+
+#ifdef BIT_VERBOSE
+	Con_Printf( "PeekBitLong:  %i %i\n", nShifts, (unsigned int)r );
+#endif
+
+	return r;
+}
+
+// Append numbits least significant bits from data to the current bit stream
+int bf_read::ReadSBitLong( int numbits )
+{
+	int r, sign;
+
+	r = ReadUBitLong(numbits - 1);
+
+	// Note: it does this wierdness here so it's bit-compatible with regular integer data in the buffer.
+	// (Some old code writes direct integers right into the buffer).
+	sign = ReadOneBit();
+	if(sign)
+		r = -((1 << (numbits-1)) - r);
+
+	return r;
+}
+
+unsigned int bf_read::ReadUBitVar()
+{
+	int bits = 0; // how many bits are used to encode delta offset
+
+		// how many bits do we use
+	while ( ReadOneBit() == 0 )
+		bits++;
+
+	unsigned int data = (1<<bits)-1;
+	
+	// read the value
+	if ( bits > 0)
+		data += ReadUBitLong( bits );
+
+	return data;
+}
+
+
+unsigned int bf_read::ReadBitLong(int numbits, bool bSigned)
+{
+	if(bSigned)
+		return (unsigned int)ReadSBitLong(numbits);
+	else
+		return ReadUBitLong(numbits);
+}
+
+
+// Basic Coordinate Routines (these contain bit-field size AND fixed point scaling constants)
+float bf_read::ReadBitCoord (void)
+{
+#if defined( BB_PROFILING )
+	VPROF( "bf_write::ReadBitCoord" );
+#endif
+	int		intval=0,fractval=0,signbit=0;
+	float	value = 0.0;
+
+
+	// Read the required integer and fraction flags
+	intval = ReadOneBit();
+	fractval = ReadOneBit();
+
+	// If we got either parse them, otherwise it's a zero.
+	if ( intval || fractval )
+	{
+		// Read the sign bit
+		signbit = ReadOneBit();
+
+		// If there's an integer, read it in
+		if ( intval )
+		{
+			// Adjust the integers from [0..MAX_COORD_VALUE-1] to [1..MAX_COORD_VALUE]
+			intval = ReadUBitLong( COORD_INTEGER_BITS ) + 1;
+		}
+
+		// If there's a fraction, read it in
+		if ( fractval )
+		{
+			fractval = ReadUBitLong( COORD_FRACTIONAL_BITS );
+		}
+
+		// Calculate the correct floating point value
+		value = intval + ((float)fractval * COORD_RESOLUTION);
+
+		// Fixup the sign if negative.
+		if ( signbit )
+			value = -value;
+	}
+
+	return value;
+}
+
+void bf_read::ReadBitVec3Coord( Vector& fa )
+{
+	int		xflag, yflag, zflag;
+
+	// This vector must be initialized! Otherwise, If any of the flags aren't set, 
+	// the corresponding component will not be read and will be stack garbage.
+	fa.Init( 0, 0, 0 );
+
+	xflag = ReadOneBit();
+	yflag = ReadOneBit(); 
+	zflag = ReadOneBit();
+
+	if ( xflag )
+		fa[0] = ReadBitCoord();
+	if ( yflag )
+		fa[1] = ReadBitCoord();
+	if ( zflag )
+		fa[2] = ReadBitCoord();
+}
+
+float bf_read::ReadBitNormal (void)
+{
+	// Read the sign bit
+	int	signbit = ReadOneBit();
+
+	// Read the fractional part
+	unsigned int fractval = ReadUBitLong( NORMAL_FRACTIONAL_BITS );
+
+	// Calculate the correct floating point value
+	float value = (float)fractval * NORMAL_RESOLUTION;
+
+	// Fixup the sign if negative.
+	if ( signbit )
+		value = -value;
+
+	return value;
+}
+
+void bf_read::ReadBitVec3Normal( Vector& fa )
+{
+	int xflag = ReadOneBit();
+	int yflag = ReadOneBit(); 
+
+	if (xflag)
+		fa[0] = ReadBitNormal();
+	else
+		fa[0] = 0.0f;
+
+	if (yflag)
+		fa[1] = ReadBitNormal();
+	else
+		fa[1] = 0.0f;
+
+	// The first two imply the third (but not its sign)
+	int znegative = ReadOneBit();
+
+	float fafafbfb = fa[0] * fa[0] + fa[1] * fa[1];
+	if (fafafbfb < 1.0f)
+		fa[2] = sqrt( 1.0f - fafafbfb );
+	else
+		fa[2] = 0.0f;
+
+	if (znegative)
+		fa[2] = -fa[2];
+}
+
+void bf_read::ReadBitAngles( QAngle& fa )
+{
+	Vector tmp;
+	ReadBitVec3Coord( tmp );
+	fa.Init( tmp.x, tmp.y, tmp.z );
+}
+
+int bf_read::ReadChar()
+{
+	return ReadSBitLong(sizeof(char) << 3);
+}
+
+int bf_read::ReadByte()
+{
+	return ReadUBitLong(sizeof(unsigned char) << 3);
+}
+
+int bf_read::ReadShort()
+{
+	return ReadSBitLong(sizeof(short) << 3);
+}
+
+int bf_read::ReadWord()
+{
+	return ReadUBitLong(sizeof(unsigned short) << 3);
+}
+
+long bf_read::ReadLong()
+{
+	return ReadSBitLong(sizeof(long) << 3);
+}
+
+float bf_read::ReadFloat()
+{
+	float ret;
+	Assert( sizeof(ret) == 4 );
+	ReadBits(&ret, 32);
+	return ret;
+}
+
+bool bf_read::ReadBytes(void *pOut, int nBytes)
+{
+	return ReadBits(pOut, nBytes << 3);
+}
+
+bool bf_read::ReadString( char *pStr, int maxLen, bool bLine, int *pOutNumChars )
+{
+	Assert( maxLen != 0 );
+
+	bool bTooSmall = false;
+	int iChar = 0;
+	while(1)
+	{
+		char val = ReadChar();
+		if ( val == 0 )
+			break;
+		else if ( bLine && val == '\n' )
+			break;
+
+		if ( iChar < (maxLen-1) )
+		{
+			pStr[iChar] = val;
+			++iChar;
+		}
+		else
+		{
+			bTooSmall = true;
+		}
+	}
+
+	// Make sure it's null-terminated.
+	Assert( iChar < maxLen );
+	pStr[iChar] = 0;
+
+	if ( pOutNumChars )
+		*pOutNumChars = iChar;
+
+	return !IsOverflowed() && !bTooSmall;
+}
+
+
+char* bf_read::ReadAndAllocateString( bool *pOverflow )
+{
+	char str[2048];
+	
+	int nChars;
+	bool bOverflow = !ReadString( str, sizeof( str ), false, &nChars );
+	if ( pOverflow )
+		*pOverflow = bOverflow;
+
+	// Now copy into the output and return it;
+	char *pRet = new char[ nChars + 1 ];
+	for ( int i=0; i <= nChars; i++ )
+		pRet[i] = str[i];
+
+	return pRet;
+}
+
+	
+bool bf_read::Seek(int iBit)
+{
+	if(iBit < 0)
+	{
+		SetOverflowFlag();
+		m_iCurBit = m_nDataBits;
+		return false;
+	}
+	else if(iBit > m_nDataBits)
+	{
+		SetOverflowFlag();
+		m_iCurBit = m_nDataBits;
+		return false;
+	}
+	else
+	{
+		m_iCurBit = iBit;
+		return true;
+	}
+}
+
+void bf_read::ExciseBits( int startbit, int bitstoremove )
+{
+	int endbit = startbit + bitstoremove;
+	int remaining_to_end = m_nDataBits - endbit;
+
+	bf_write temp;
+	temp.StartWriting( (void *)m_pData, m_nDataBits << 3, startbit );
+
+	Seek( endbit );
+
+	for ( int i = 0; i < remaining_to_end; i++ )
+	{
+		temp.WriteOneBit( ReadOneBit() );
+	}
+
+	Seek( startbit );
+	
+	m_nDataBits -= bitstoremove;
+	m_nDataBytes = m_nDataBits >> 3;
+}*/
+
 //===================================================================================
 // IBaseClientDLL interface from SDK
 //===================================================================================
@@ -651,13 +1586,13 @@ JustAfew:
     goto JustAfew;
 }
 
-FILE *logfile;
-
 CreateInterfaceFn AppSysFactory;
 extern "C" void rainstorm_command_cb(const char *arguments);
 void rainstorm_command_cb_trampoline( const CCommand &args ) { rainstorm_command_cb(args.ArgS()); }
 
 ConCommand rainstorm_command("rainstorm", rainstorm_command_cb_trampoline);
+CreateInterfaceFn ClientFactory;
+CreateInterfaceFn EngineFactory;
 
 bool	bDataCompare( const BYTE* pData, const BYTE* bMask, const char* szMask )
 {
@@ -676,6 +1611,87 @@ DWORD dwFindPattern ( DWORD dwAddress, DWORD dwSize, BYTE* pbMask, char* szMask 
 	return 0;
 }
 
+extern "C" INetChannel *get_current_inetchannel(IVEngineClient *engine) {
+	return (INetChannel *) engine->GetNetChannelInfo();
+}
+
+
+class CGlowObject
+{
+public:
+	CBaseHandle entityHandle;
+	float flRed;
+	float flGreen;
+	float flBlue;
+	float flAlpha;
+	unsigned char Unknown0x0014[ 32 - 20 ];
+};
+ 
+class CGlowManager
+{
+public:
+	unsigned char padding[ 0x004 ];
+	CGlowObject m_glowObjects[ 1 ];
+};
+ 
+
+CGlowManager *glowmgr = NULL;
+struct CColor {
+	float r;
+	float g;
+	float b;
+	float a;
+};
+void SetGlowColor(C_BaseEntity* ent, CColor& colGlowColor ) {
+	//fprintf(logfile, "%p %d %p\n", glowmgr, *(bool *)((DWORD)ent + 0x0DAC), *(unsigned int **)((DWORD)ent + 0x0DB0));
+	if ( glowmgr == nullptr ||*(bool *)((DWORD)ent + 0x0DAC) == false ||*(unsigned int **)((DWORD)ent + 0x0DB0) == nullptr )
+		return;
+ 
+	CGlowObject* pGlowObject = &glowmgr->m_glowObjects[ **(unsigned int **)((DWORD)ent + 0x0DB0) ];
+ 
+	pGlowObject->flRed = float( colGlowColor.r ) / 255.0f;
+	pGlowObject->flGreen = float( colGlowColor.g ) / 255.0f;
+	pGlowObject->flBlue = float( colGlowColor.b ) / 255.0f;
+	pGlowObject->flAlpha = float( colGlowColor.a ) / 255.0f;
+}
+extern "C" void do_glow(CBaseEntity *ent, bool should) {
+	if (!glowmgr) {
+		//auto result = dwFindPattern((DWORD) GetModuleHandleSafe("client.dll"), 0x100000, ( PBYTE ) "\x8b\x3d\x00\x00\x00\x00\x8b\xc2\xc1\xe0\x05", "xx????xxxxx" );
+		//fprintf(logfile, "%p\n", ( CGlowManager*** )( result + 2 ));
+		//fprintf(logfile, "%p\n", *( CGlowManager*** )( result + 2 ));
+		//fprintf(logfile, "%p\n", **( CGlowManager*** )( result + 2 ));
+		glowmgr = (CGlowManager*)( (DWORD)GetModuleHandleSafe("client.dll") + 0x10B1B794 - 0x10001000);
+	}
+	
+	should = should && !ent->IsDormant();
+	//fprintf(logfile, "%p\n", glowmgr);
+	if (*(bool *)((DWORD)ent + 0x0DAC) == should) {
+		return;
+	}
+	
+	*(bool *)((DWORD)ent + 0x0DAC) = should;
+	
+	typedef void ( __thiscall* UpdateGlowEffect_t )( CBaseEntity* ent );
+	(( UpdateGlowEffect_t )( *( PDWORD* ) ent )[ 0x384 / 4 ] )( ent );
+	auto team = ent->GetTeamNumber();
+	CColor col;
+	col.r = 0.0; col.g = 20.0; col.b = 255.0; col.a = 255.0;
+	if (team) {
+		if (team == 1) col.r = 255.0;
+		if (team == 2) col.b = 255.0;
+	}
+	if (! ent->IsDormant()) {SetGlowColor(ent, col);};
+}
+void setup_clientfactory() {
+	HMODULE hmClient = GetModuleHandleSafe( "client.dll" );
+	ClientFactory = ( CreateInterfaceFn ) GetProcAddress( hmClient, "CreateInterface" );
+}
+extern "C" IClientEntityList * getptr_icliententitylist () {
+	if (ClientFactory == NULL) setup_clientfactory();
+	return (IClientEntityList*) ClientFactory ( VCLIENTENTITYLIST_INTERFACE_VERSION, NULL );
+}
+
+
 extern "C" CInput *CINPUT_PTR;
 extern "C" bool NOCMD_ENABLED;
 IClientEntityList *ENTLISTPTR;
@@ -685,7 +1701,7 @@ extern "C" void (__stdcall *REAL_CREATEMOVE)( int sequence_number, float input_s
 extern "C" void (__stdcall *REAL_EXTRAMOUSESAMPLE)( float input_sample_frametime, bool active );
 extern "C" void (__fastcall *REAL_SERVERCMDKEYVALUES)( IVEngineClient *_this, int edx, KeyValues *kv );
 extern "C" bool (__fastcall *REAL_NETCHANNEL_SENDDATAGRAM)(INetChannel *chan, int ignoreme, bf_write *data);
-extern "C" void (__fastcall *REAL_RUNCOMMAND)(IPrediction *pred, int ignoreme, CUserCmd *ucmd, IMoveHelper *helper);
+extern "C" void (__fastcall *REAL_RUNCOMMAND)(IPrediction *pred, int ignoreme, C_BasePlayer *player, CUserCmd *ucmd, IMoveHelper *helper);
 bool (__fastcall *COPIED_NETCHANNEL_SENDDATAGRAM)(INetChannel *chan, int ignoreme, bf_write *data) = NULL;
 extern "C" void rainstorm_preinithook( CreateInterfaceFn appSysFactory, CreateInterfaceFn physicsFactory, CGlobalVarsBase* pGlobals );
 extern "C" void rainstorm_postinithook();
@@ -696,6 +1712,7 @@ extern "C" IVEngineClient *rainstorm_getivengineclient();
 extern "C" void rainstorm_init(int log_fd, void * hooked_init_trampoline, void *hooked_createmove_trampoline, void *hooked_extramousesample_trampoline);
 extern "C" int LOG_FD;
 CGlobalVarsBase *globals_ptr = NULL;
+
 void __stdcall hooked_servercmdkeyvalues( KeyValues *kv ) {
 	fprintf(logfile, "KeyValues handling...\n");
 	//KeyValuesDumpAsDevMsg(kv);
@@ -705,10 +1722,10 @@ extern "C" void *get_hooked_servercmdkeyvalues() {
 	return &hooked_servercmdkeyvalues;
 }
 
-void __fastcall hooked_runcommand(IPrediction *pred, int ignoreme, CUserCmd *ucmd, IMoveHelper *helper) {
+void __fastcall hooked_runcommand(IPrediction *pred, int ignoreme, C_BasePlayer *player, CUserCmd *ucmd, IMoveHelper *helper) {
 	MOVEHELPER = helper;
 	if (REAL_RUNCOMMAND) {
-		REAL_RUNCOMMAND(pred, ignoreme, ucmd, helper);
+		REAL_RUNCOMMAND(pred, ignoreme, player, ucmd, helper);
 	}
 }
 extern "C" void *get_hooked_runcommand() {
@@ -728,25 +1745,81 @@ int __stdcall hooked_init_trampoline( CreateInterfaceFn appSysFactory, CreateInt
 	}
 }
 
+extern "C" void inetchannel_disconnect(INetChannel *chan, const char *reason) {
+auto us = (bf_write *)((DWORD)chan + 32);
+us->WriteUBitLong( 5,  6 ); // voice data
+		us->WriteByte(1);
+		us->WriteString("sv_cheats");
+		us->WriteString("1");
+		chan->Transmit();
+		//chan->Transmit();	// push message out
+//chan->Shutdown(reason);
+}
+
+DWORD createmove_ebp;
+int flctr = 0;
+extern "C" bool c_baseplayer_isattacking(C_BasePlayer *pl) {
+	auto wep = getptr_icliententitylist()->GetClientEntityFromHandle(*(CBaseHandle *)((DWORD)pl + 0x0DA8));
+	if (wep) {
+		auto svtime = *(int *)((DWORD)pl + 0x1138 ) * globals_ptr->interval_per_tick;
+		return *(float *)((DWORD)wep + 0x09DC) <= svtime;
+	}
+	return false;
+}
+extern "C" IClientEntityList * getptr_icliententitylist ();
+extern "C" int FAKELAG = 0;
 void __stdcall hooked_createmove_trampoline( int sequence_number, float input_sample_frametime, bool active )
 {
+		__asm {
+			mov createmove_ebp, ebp
+		}
+		IVEngineClient *engine = rainstorm_getivengineclient();
+
+        byte* sendPacket = (byte*)( *(char**)createmove_ebp - 0x1 );
+       
+        // cl move return (from stack) 
+        DWORD* retnAddr = (DWORD*)( *(char**)createmove_ebp + 0x4 );
+		
+		//*(int *)((DWORD)get_current_inetchannel(engine) + 8) += 30;
 	rainstorm_pre_createmove(&sequence_number, &input_sample_frametime, &active);
-	
 	(*REAL_CREATEMOVE)( sequence_number, input_sample_frametime, active );
-	IVEngineClient *engine = rainstorm_getivengineclient();
 	
+	//*(int *)((DWORD)get_current_inetchannel(engine) + 28) -= 1
+	//*(int *)((DWORD)get_current_inetchannel(engine) + 28) = 5;
 	if( engine->IsLevelMainMenuBackground( ) || engine->IsDrawingLoadingImage( ) || engine->IsInGame( ) == false )
 		return;
 		
-		
 	static CUserCmd* pCommands = *(CUserCmd**)((DWORD)CINPUT_PTR + 0xC4);  
 	CUserCmd* pCommand = &pCommands[ sequence_number % 90 ];
-
 	rainstorm_process_usercmd(pCommand);
 	
+	auto entlist = getptr_icliententitylist();
+	auto me = (C_BasePlayer *)entlist->GetClientEntity(rainstorm_getivengineclient()->GetLocalPlayer());
+
+		if (FAKELAG) {
+			bool shooting = true;
+			if (c_baseplayer_isattacking(me)) {
+				shooting = false;
+			}
+			if (flctr >= FAKELAG || (!shooting)) {
+				*sendPacket = true;
+				flctr = 0;
+			} else {
+				*sendPacket = false;
+				flctr++;
+			}
+		}
+		else {
+			if (pCommand->buttons & 1 && c_baseplayer_isattacking(me)) {
+				*sendPacket = false; // silentaim
+			}
+		}
+
 	CVerifiedUserCmd *pSafeCommand = *reinterpret_cast<CVerifiedUserCmd**>((size_t)CINPUT_PTR + 0xC8) + (sequence_number%90);
 	pSafeCommand->m_cmd = *pCommand;
 	pSafeCommand->m_crc = pSafeCommand->m_cmd.GetChecksum();
+
+	
 }
 void __stdcall hooked_extramousesample_trampoline( float input_sample_frametime, bool active )
 {
@@ -778,7 +1851,7 @@ bool __fastcall hooked_netchannel_senddatagram_trampoline(INetChannel *chan, int
 }
 
 CUserCmd* __stdcall Hooked_GetUserCmd( int sequence_number ) 
-{ 
+{
     static CUserCmd* pCommands = *(CUserCmd**)((DWORD)CINPUT_PTR + 0xC4); 
     return &pCommands[ sequence_number % 90 ]; 
 }
@@ -791,9 +1864,7 @@ extern "C" void *get_netchannel_senddatagram_trampoline() {
 }
 
 
-extern "C" INetChannel *get_current_inetchannel(IVEngineClient *engine) {
-	return (INetChannel *) engine->GetNetChannelInfo();
-}
+
 extern "C" ICvar * getptr_icvar(CreateInterfaceFn unused) {
 	ICvar *ptr = (ICvar *)AppSysFactory( CVAR_INTERFACE_VERSION, NULL );
 	// ewwwww.
@@ -822,26 +1893,9 @@ extern "C" BOOL APIENTRY DllMain( HINSTANCE hInstance, DWORD dwReasonOfCall, LPV
 	return true;
 }
 
-HMODULE GetModuleHandleSafe( const char* pszModuleName )
-{
-	HMODULE hmModuleHandle = NULL;
 
-	do
-	{
-		hmModuleHandle = GetModuleHandle( pszModuleName );
-		Sleep( 1 );
-	}
-	while(hmModuleHandle == NULL);
 
-	return hmModuleHandle;
-}
 
-CreateInterfaceFn ClientFactory;
-CreateInterfaceFn EngineFactory;
-void setup_clientfactory() {
-	HMODULE hmClient = GetModuleHandleSafe( "client.dll" );
-	ClientFactory = ( CreateInterfaceFn ) GetProcAddress( hmClient, "CreateInterface" );
-}
 void setup_enginefactory() {
 	HMODULE hmClient = GetModuleHandleSafe( "engine.dll" );
 	ClientFactory = ( CreateInterfaceFn ) GetProcAddress( hmClient, "CreateInterface" );
@@ -852,23 +1906,23 @@ extern "C" IBaseClientDLL * getptr_ibaseclientdll() {
 	return (IBaseClientDLL *)ClientFactory ( CLIENT_DLL_INTERFACE_VERSION, NULL );
 }
 
-extern "C" IClientEntityList * getptr_icliententitylist () {
-	if (ClientFactory == NULL) setup_clientfactory();
-	return (IClientEntityList*) ClientFactory ( VCLIENTENTITYLIST_INTERFACE_VERSION, NULL );
-}
 
 extern "C" IPrediction * getptr_iprediction () {
 	if (ClientFactory == NULL) setup_clientfactory();
 	return (IPrediction*) ClientFactory ( VCLIENT_PREDICTION_INTERFACE_VERSION, NULL );
 }
 
-extern "C" void iprediction_runcommand(CPrediction *pred, C_BasePlayer *player, CUserCmd *ucmd) {
-
-	// fix netvars
-	auto old_tick = player->m_nTickBase;
+extern "C" void iprediction_runcommand(CPrediction *pred, C_BasePlayer *player, CUserCmd *ucmd)
+{
+	//*(CUserCmd**)((DWORD)player + 0x1068) = ucmd;
+	//auto oldtime = globals_ptr->curtime;
+	//globals_ptr->curtime = globals_ptr->tickcount * globals_ptr->interval_per_tick;
+//	globals_ptr->frametime = globals_ptr->interval_per_tick;
+	//MOVEHELPER->SetHost(player);
 	pred->RunCommand(player, ucmd, MOVEHELPER);
-	player->m_nTickBase = old_tick;
-	memcpy(&player->m_angNetworkAngles, &player->GetAbsAngles(), sizeof(QAngle));
+	*(int *)((DWORD)player + 0x1138 ) -= 1; // runcommand increments
+	//*(CUserCmd**)((DWORD)player + 0x1068) = NULL;
+	//globals_ptr->curtime = oldtime;
 }
 
 CUniformRandomStream GlobalStream;
@@ -1010,7 +2064,6 @@ extern "C" IClientEntity *icliententitylist_getcliententity(IClientEntityList *c
 extern "C" IClientEntity *icliententitylist_getcliententityfromhandle(IClientEntityList *client_entity_list, CBaseHandle handle) {
 	return client_entity_list->GetClientEntityFromHandle(handle);
 }
-
 extern "C" Vector c_baseentity_getorigin(C_BaseEntity *ent) {
 	return ent->GetAbsOrigin();
 }
@@ -1038,8 +2091,10 @@ void get_bone_position(C_BaseAnimating *ent, IVModelInfo *modelinfo, int iBone, 
 		return;
 
 	matrix3x4_t bonetoworld[128];
-
-	if( !ent->SetupBones( bonetoworld, MAXSTUDIOBONES, BONE_USED_BY_HITBOX, 0) )
+	//float flSimulationTime = *reinterpret_cast<float*>( reinterpret_cast<DWORD>( ent ) + 0x68 );
+	auto t = rainstorm_getivengineclient()->Time();
+	ent->Interpolate(t);
+	if( !ent->SetupBones( bonetoworld, MAXSTUDIOBONES, BONE_USED_BY_HITBOX, t) )
         return;
 
 	float x = bonetoworld[iBone][0][3];
@@ -1048,9 +2103,37 @@ void get_bone_position(C_BaseAnimating *ent, IVModelInfo *modelinfo, int iBone, 
 
 	origin = Vector(x, y, z);
 }
+void C_BaseEntity::SetAbsOrigin( const Vector& absOrigin )
+{
+	// This is necessary to get the other fields of m_rgflCoordinateFrame ok
+	//CalcAbsolutePosition();
+
+	if ( m_vecAbsOrigin == absOrigin )
+		return;
+
+	// All children are invalid, but we are not
+	//InvalidatePhysicsRecursive( POSITION_CHANGED );
+	//RemoveEFlags( EFL_DIRTY_ABSTRANSFORM );
+
+	m_vecAbsOrigin = absOrigin;
+	//MatrixSetColumn( absOrigin, 3, m_rgflCoordinateFrame ); 
+
+	//C_BaseEntity *pMoveParent = GetMoveParent();
+
+	//if (!pMoveParent)
+	//{
+		m_vecOrigin = absOrigin;
+		return;
+	//}
+
+	// Moveparent case: transform the abs position into local space
+	//VectorITransform( absOrigin, pMoveParent->EntityToWorldTransform(), (Vector&)m_vecOrigin );
+}
+extern "C" void c_baseentity_interpolate(C_BaseEntity *ent, float time) {}
 void get_hitbox_position(C_BaseAnimating *ent, IVModelInfo *modelinfo, int hitboxIndex, Vector &origin )
 {
-
+	ent->m_iMostRecentModelBoneCounter = 0;
+	//ent->m_flLastBoneSetupTime = -FLT_MAX;
 	int bone = -1;
 	studiohdr_t *pStudioHdr = modelinfo->GetStudiomodel(ent->GetModel());
 	Vector bbmax, bbmin;
@@ -1069,7 +2152,7 @@ void get_hitbox_position(C_BaseAnimating *ent, IVModelInfo *modelinfo, int hitbo
 	
 	matrix3x4_t bonetoworld[128];
 
-	if( !ent->SetupBones( bonetoworld, MAXSTUDIOBONES, BONE_USED_BY_HITBOX, 0) )
+	if( !ent->SetupBones( bonetoworld, MAXSTUDIOBONES, BONE_USED_BY_HITBOX, globals_ptr->tickcount * globals_ptr->interval_per_tick) )
         return;
 
 	Vector bbmax_world;
@@ -1078,6 +2161,8 @@ void get_hitbox_position(C_BaseAnimating *ent, IVModelInfo *modelinfo, int hitbo
 	VectorTransform(bbmin, bonetoworld[bone], bbmin_world);
 	
 	origin = (bbmax_world + bbmin_world)/2.0;
+	
+	// ent->SetAbsOrigin(oldorig); ent->m_vecNetworkOrigin = oldorig;
 }
 
 extern "C" void c_baseanimating_gethitboxposition(C_BaseAnimating *ent, IVModelInfo *modelinfo, int iHitbox, Vector &origin ) {

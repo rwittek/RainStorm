@@ -58,6 +58,7 @@ ptr_wrapper!(IUniformRandomStreamPtr)
 ptr_wrapper!(IPredictionPtr)
 
 extern "C" {
+	pub static mut FAKELAG: u32;
 	pub fn getptr_ivengineclient() -> IVEngineClientPtr; // MAYBE NULL
 	pub fn ivengineclient_clientcmd(engine: IVEngineClientPtr, cmd_string: * const libc::c_char);
 	pub fn ivengineclient_time(engine: IVEngineClientPtr) -> libc::c_float;
@@ -90,6 +91,7 @@ extern "C" {
 	pub fn c_baseentity_getindex(ent: C_BaseEntityPtr) -> libc::c_int;
 	pub fn c_baseentity_getclassname(ent: C_BaseEntityPtr) -> *const libc::c_char;
 	pub fn c_baseentity_getvelocity(ent: C_BaseEntityPtr) -> Vector;
+	pub fn c_baseentity_interpolate(ent: C_BaseEntityPtr, time: libc::c_float);
 	pub fn getptr_ivmodelinfo() -> IVModelInfoPtr;
 	
 	pub fn c_baseanimating_gethitboxposition(ent: C_BaseEntityPtr, modelinfo: IVModelInfoPtr, hitbox: libc::c_int,
@@ -98,7 +100,7 @@ extern "C" {
 		origin: &mut Vector);
 	pub fn c_baseanimating_getnumbones(ent: C_BaseEntityPtr, modelinfo: IVModelInfoPtr) -> libc::c_int;
 	pub fn c_baseanimating_getnumhitboxes(ent: C_BaseEntityPtr, modelinfo: IVModelInfoPtr) -> libc::c_int;
-	
+	pub fn c_baseplayer_isattacking(ent: C_BaseEntityPtr) -> bool;
 	pub fn getptr_cinput(client: IBaseClientDLLPtr) -> CInputPtr;
 	pub fn icvar_findvar(icvar: ICvarPtr, name: * const char) -> ConVarPtr; // MAYBE NULL;
 	pub fn convar_setvalue_raw_int(cvar: ConVarPtr, value: libc::c_int);
@@ -126,4 +128,8 @@ extern "C" {
 	pub fn get_critbucket_contents(ent: C_BaseEntityPtr) -> libc::c_float;
 	pub fn calc_seed_from_command_number(cmdnum: libc::c_int) -> libc::c_int;
 	pub fn get_tracefilter(me: C_BaseEntityPtr) -> ITraceFilterPtr;
+	
+	pub fn inetchannel_disconnect(chan: INetChannelPtr, reason: CString);
+	
+	pub fn do_glow(ent: C_BaseEntityPtr, should: bool);
 }

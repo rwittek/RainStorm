@@ -190,7 +190,7 @@ pub unsafe extern "C" fn rainstorm_pre_createmove(sequence_number: *mut libc::c_
 #[no_mangle]
 pub unsafe extern "C" fn rainstorm_process_usercmd(cmd: &mut sdk::CUserCmd) {
 	if cheats::CHEAT_MANAGER.is_not_null() {
-		//maybe_hook_inetchannel((*cheats::CHEAT_MANAGER).get_gamepointers());
+		maybe_hook_inetchannel((*cheats::CHEAT_MANAGER).get_gamepointers());
 		(*cheats::CHEAT_MANAGER).process_usercmd(cmd);
 	} else {
 		quit!("Cheat manager not found!\n");
@@ -250,8 +250,8 @@ pub extern "C" fn rainstorm_init(log_fd: libc::c_int, hooked_init_trampoline: *c
 		hooker.hook(8, sdk::get_hooked_getusercmd());
 	
 		let mut iprediction_hooker = vmthook::VMTHooker::new(sdk::raw::getptr_iprediction().to_uint() as *mut *const ());
-		REAL_RUNCOMMAND = hooker.get_orig_method(18);
-		hooker.hook(18, sdk::raw::get_hooked_runcommand());
+		REAL_RUNCOMMAND = iprediction_hooker.get_orig_method(17);
+		iprediction_hooker.hook(17, sdk::raw::get_hooked_runcommand());
 	};
 }
 
