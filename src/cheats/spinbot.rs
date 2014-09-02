@@ -23,7 +23,7 @@ impl Cheat for Spinbot {
 			return;
 		}
 		
-		self.currangle = (self.currangle + 20.0)%360.0;
+		self.currangle = (self.currangle + 30.529)%360.0;
 		
 		let me = utils::get_local_player_entity(ptrs);
 		

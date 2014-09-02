@@ -39,7 +39,8 @@ fn get_target_type<EntType: Entity>(_ptrs: &GamePointers, ent: EntType) -> Optio
 
 pub enum AimbotMode {
 	SemiSilent,
-	Sticky(f32)
+	Sticky(f32),
+	Predictive(f32, f32)
 }
 
 pub struct Aimbot {
@@ -62,7 +63,7 @@ impl Aimbot {
 
 	/// Find the best thing to shoot at... if there is one.
 	/// Otherwise, returns None.
-	fn find_target(&mut self, ptrs: &GamePointers, viewangles: &sdk::QAngle, time: f32) -> Option<(i32, sdk::Vector)> {
+	fn find_target(&mut self, ptrs: &GamePointers, viewangles: &sdk::QAngle, time: f32) -> Option<(sdk::raw::C_BaseEntityPtr, sdk::Vector)> {
 		let me: TFPlayer = unsafe { Entity::from_ptr( utils::get_local_player_entity(ptrs)) };
 		
 		let mut eyes = me.get_origin();
@@ -151,8 +152,15 @@ impl Aimbot {
 					.filter(|&(ptr, targtype)| match targtype {
 						Player => {
 							let player: TFPlayer = unsafe { Entity::from_ptr(ptr) };
+							let (cond, _, _) = player.get_conds();
+							let condok= if cond & (
+								(1<<14) | (1<<5) | (1<<13)
+							) != 0 {
+								// invuln
+								false
+							} else {true};
 							
-							player.get_team() != me.get_team() && player.get_life_state() == 0
+							player.get_team() != me.get_team() && player.get_life_state() == 0 && condok
 						},
 						Sentry | Dispenser | Teleporter => {
 							let object: BaseObject = unsafe { Entity::from_ptr(ptr) };
@@ -166,9 +174,6 @@ impl Aimbot {
 						let mut player: sdk::TFPlayer = unsafe {
 							Entity::from_ptr(ent.get_ptr())
 						};
-						log!("Interpolating... ");
-						player.interpolate(0.0);
-						log!("OK.\n");
 						match self.hitbox {
 							Some(hitbox) => {
 								
@@ -190,15 +195,14 @@ impl Aimbot {
 			}
 		}
 		
-		best_targ.map(|(ent, pos)| (ent.get_index(), pos))
-		
+		best_targ
 		/*+ {
 				(ent.get_velocity() - me.get_velocity()).scale(unsafe { sdk::raw::get_current_latency(ptrs.ivengineclient.get_ptr()) })
 			}
 		})*/
 	}
 			
-	fn aim_at_target(&mut self, ptrs: &GamePointers, cmd: &mut sdk::CUserCmd, target: Option<sdk::Vector>) {	
+	fn aim_at_target(&mut self, ptrs: &GamePointers, cmd: &mut sdk::CUserCmd, target: Option<(sdk::raw::C_BaseEntityPtr, sdk::Vector)>) {	
 		use cmath;
 		
 		let me = utils::get_local_player_entity(ptrs);
@@ -218,7 +222,7 @@ impl Aimbot {
 					return; // not attacking, who cares
 				}
 				match target {
-					Some(target) => {
+					Some((_, target)) => {
 						let aimvec = target - eyes;
 						
 						let oldviewangles = cmd.viewangles;
@@ -231,12 +235,52 @@ impl Aimbot {
 					None => ()
 				}
 			},
-			
+			Predictive(speed, gravscale) => {
+				match target {
+					Some((ent, curpos)) => {
+						let latency = unsafe { sdk::raw::get_current_latency(ptrs.ivengineclient.get_ptr(), 3) };
+						let mypos = eyes; //+ (me.get_velocity().scale(latency));
+						let mut vel = ent.get_velocity();
+						
+						let mut predpos = curpos;
+						//log!("vel: {} lat: {}\n", vel, latency);
+						for _ in range(0u, 5u) {
+							let initialray = predpos - eyes;
+						
+							let traveltime = initialray.length() / speed;
+							let predtime = traveltime + latency;
+							
+							// TODO: gravity
+							let targetgravdelta = if ent.get_classname() == "CTFPlayer" {
+								let flags = unsafe { *ent.ptr_offset::<u32>(0x0378) };
+								if (flags & 1) != 0 { // FL_ONGROUND is set
+									0.0
+								} else {
+									-0.5 * unsafe {sdk::raw::get_gravity()} * predtime * predtime
+								}
+							} else { 0.0 };
+							let projgravdelta = (-0.5 * unsafe { sdk::raw::get_gravity() } * predtime * predtime * gravscale);
+							let corr = vel.scale(predtime) + sdk::Vector { x: 0.0, y: 0.0, z: targetgravdelta - projgravdelta};
+							//log!("corr: {}\n", corr);
+							predpos = curpos + corr;
+						}
+						let ray = predpos - mypos;
+
+					//	cmd.buttons |= (1<<1);
+						let oldviewangles = cmd.viewangles;
+						cmd.viewangles = ray.to_angle();
+						
+						let (forwardmove, sidemove, upmove) = sdk::utils::rotate_movement((cmd.forwardmove, cmd.sidemove, cmd.upmove),
+								oldviewangles, cmd.viewangles);
+						cmd.forwardmove = forwardmove; cmd.sidemove = sidemove; cmd.upmove = upmove;
+					}, _ => ()
+				}
+			},
 			Sticky(base_sens) => {
 				let mut sens_var = ptrs.icvar.expect("bad ICvar\n").find_var("sensitivity").expect("sens not found!");
 				
 				let sensscale = match target {
-					Some(target) => {
+					Some((_, target)) => {
 						let aimvec = target - eyes;
 						
 						let currentaim = cmd.viewangles.to_vector();
@@ -257,9 +301,9 @@ impl Aimbot {
 
 	fn modify_cmd(&mut self, ptrs: &GamePointers, mut cmd: sdk::CUserCmd) -> sdk::CUserCmd {
 		let maybe_target = self.find_target(ptrs, &cmd.viewangles, cmd.tick_count as f32 / 66.0);
-		let predicted_target = maybe_target.map(|(hb, pos)| pos); // self.predict(ptrs, cmd.tick_count, maybe_target);
-		self.aim_at_target(ptrs, &mut cmd, predicted_target);
-		match predicted_target {
+
+		self.aim_at_target(ptrs, &mut cmd, maybe_target);
+		match maybe_target {
 			Some(target) => (),
 			None => { // nothing to aim at
 				if self.stop_firing != 0 {
@@ -330,7 +374,13 @@ impl Cheat for Aimbot {
 			"fovweight" => {
 				self.fovweight = ::utils::str_to_integral::<u32>(val[0]) as f32;
 				log!("FOV weight: {}\n", self.fovweight);
-			}
+			},
+			"projinfo" => {
+				self.mode = Predictive(::utils::str_to_integral::<u32>(val[0]) as f32, ::utils::str_to_integral::<u32>(val[1]) as f32 / 1000.0);
+			},
+			"regular" => {
+				self.mode = SemiSilent;
+			},
 			_ => {}
 		}
 	}

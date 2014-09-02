@@ -8,7 +8,6 @@ extern crate collections;
 extern crate rand;
 
 pub use core::prelude::*;
-pub use core::result::{Result, Ok, Err};
 pub use cheats::{Cheat, CheatManager};
 pub use alloc::owned::Box;
 pub use collections::Vec;

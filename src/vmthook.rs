@@ -2,7 +2,7 @@ use core;
 use libc;
 use core::ptr::RawPtr;
 
-static VMT_MAX_SIZE_YOLO: u32 = 512; // swag
+static VMT_MAX_SIZE_YOLO: uint = 512; // swag
 type VMT = [*const (), ..VMT_MAX_SIZE_YOLO];
 
 pub struct VMTHooker { // this should be renamed.......

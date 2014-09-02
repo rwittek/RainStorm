@@ -6,7 +6,7 @@ use alloc;
 use core;
 use GamePointers;
 use libc;
-
+use collections::MutableSeq;
 pub mod triggerbot;
 pub mod cvarunlocker;
 pub mod namechanger;
@@ -19,6 +19,7 @@ pub mod condremover;
 pub mod spinbot;
 pub mod chatspam;
 pub mod esp;
+pub mod airblast;
 pub static mut CHEAT_MANAGER: *mut CheatManager = 0 as *mut CheatManager;
 
 pub fn cheatmgr_setup() {
@@ -60,7 +61,7 @@ pub trait Cheat {
 }
 
 pub struct CheatManager {
-	cheats: Vec<Box<Cheat>>,
+	cheats: Vec<Box<Cheat+'static>>,
 	
 	ptrs: GamePointers
 }
@@ -70,18 +71,19 @@ pub struct CheatManager {
 impl CheatManager {
 	pub fn new() -> CheatManager {
 		log!("Constructing cheats...\n");
-		let triggerbot: Box<triggerbot::Triggerbot> = box Cheat::new();
-		let cvarunlocker: Box<cvarunlocker::CvarUnlocker> = box Cheat::new();
-		let namechanger: Box<namechanger::NameChanger> = box Cheat::new();
-		let aimbot: Box<aimbot::Aimbot> = box Cheat::new();
-		let nocmd: Box<nocmd::NoCmd> = box Cheat::new();
-		let nospread: Box<nospread::NoSpread> = box Cheat::new();
-		let crithack: Box<crithack::Crithack> = box Cheat::new();
-		let bhop: Box<bhop::Bunnyhop> = box Cheat::new();
-		let condremover: Box<condremover::CondRemover> = box Cheat::new();
-		let spinbot: Box<spinbot::Spinbot> = box Cheat::new();
-		let chatspam: Box<chatspam::ChatSpam> = box Cheat::new();
-		let esp: Box<esp::ESP> = box Cheat::new();
+		let triggerbot: triggerbot::Triggerbot = Cheat::new();
+		let cvarunlocker: cvarunlocker::CvarUnlocker = Cheat::new();
+		let namechanger: namechanger::NameChanger = Cheat::new();
+		let aimbot: aimbot::Aimbot = Cheat::new();
+		let nocmd: nocmd::NoCmd = Cheat::new();
+		let nospread: nospread::NoSpread = Cheat::new();
+		let crithack: crithack::Crithack = Cheat::new();
+		let bhop: bhop::Bunnyhop = Cheat::new();
+		let condremover: condremover::CondRemover = Cheat::new();
+		let spinbot: spinbot::Spinbot = Cheat::new();
+		let chatspam: chatspam::ChatSpam = Cheat::new();
+		let esp: esp::ESP = Cheat::new();
+		let airblast: airblast::Airblast = Cheat::new();
 		log!("Creating CheatManager...\n");
 		let mut mgr = CheatManager { 
 			cheats: Vec::new(),
@@ -90,18 +92,19 @@ impl CheatManager {
 		};
 		
 		log!("Pushing cheats...\n");
-		mgr.cheats.push(nospread);
-		mgr.cheats.push(crithack);
-		mgr.cheats.push(cvarunlocker);
-		mgr.cheats.push(aimbot);
-		mgr.cheats.push(triggerbot);
-		mgr.cheats.push(namechanger);
-		mgr.cheats.push(nocmd);
-		mgr.cheats.push(bhop);
-		mgr.cheats.push(spinbot);
-		mgr.cheats.push(condremover);
-		mgr.cheats.push(chatspam);
-		mgr.cheats.push(esp);
+		mgr.cheats.push(box nospread);
+		mgr.cheats.push(box crithack);
+		mgr.cheats.push(box cvarunlocker);
+		mgr.cheats.push(box aimbot);
+		mgr.cheats.push(box triggerbot);
+		mgr.cheats.push(box airblast);
+		mgr.cheats.push(box namechanger);
+		mgr.cheats.push(box nocmd);
+		mgr.cheats.push(box bhop);
+		mgr.cheats.push(box spinbot);
+		mgr.cheats.push(box condremover);
+		mgr.cheats.push(box chatspam);
+		mgr.cheats.push(box esp);
 		mgr
 	}
 	pub fn handle_command(&mut self, command: &str, arguments: &[&str]) {

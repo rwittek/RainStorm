@@ -29,6 +29,12 @@ impl Cheat for CondRemover {
 				| (1<<0) // slow
 				| (1 << 14)
 				| (1 << 15)
+				| (1 << 9) // melee
+			);
+			
+			let mycondex = me.mut_ptr_offset::<u32>(0x0490);
+			*mycondex = *mycondex & ! (
+				1<<9
 			);
 		}
 		

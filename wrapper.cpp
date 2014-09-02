@@ -1655,6 +1655,7 @@ void SetGlowColor(C_BaseEntity* ent, CColor& colGlowColor ) {
 	pGlowObject->flAlpha = float( colGlowColor.a ) / 255.0f;
 }
 extern "C" void do_glow(CBaseEntity *ent, bool should) {
+	static int ugly_hack = 0;
 	if (!glowmgr) {
 		//auto result = dwFindPattern((DWORD) GetModuleHandleSafe("client.dll"), 0x100000, ( PBYTE ) "\x8b\x3d\x00\x00\x00\x00\x8b\xc2\xc1\xe0\x05", "xx????xxxxx" );
 		//fprintf(logfile, "%p\n", ( CGlowManager*** )( result + 2 ));
@@ -1666,7 +1667,11 @@ extern "C" void do_glow(CBaseEntity *ent, bool should) {
 	should = should && !ent->IsDormant();
 	//fprintf(logfile, "%p\n", glowmgr);
 	if (*(bool *)((DWORD)ent + 0x0DAC) == should) {
-		return;
+		if (ugly_hack < 10) {
+			return;
+		} else {
+			ugly_hack = 0;
+		}
 	}
 	
 	*(bool *)((DWORD)ent + 0x0DAC) = should;
@@ -1746,30 +1751,37 @@ int __stdcall hooked_init_trampoline( CreateInterfaceFn appSysFactory, CreateInt
 }
 
 extern "C" void inetchannel_disconnect(INetChannel *chan, const char *reason) {
-auto us = (bf_write *)((DWORD)chan + 32);
-us->WriteUBitLong( 5,  6 ); // voice data
-		us->WriteByte(1);
-		us->WriteString("sv_cheats");
-		us->WriteString("1");
-		chan->Transmit();
-		//chan->Transmit();	// push message out
+	chan->RequestFile("maps/itemtest.bsp");
+	chan->Transmit();
+	/*auto us = (bf_write *)((DWORD)chan + 32);
+	us->WriteUBitLong( 5,  6 ); // voice data
+			us->WriteByte(1);
+			us->WriteString("sv_cheats");
+			us->WriteString("1");
+			chan->Transmit();
+		//chan->Transmit();	// push message out*/
 //chan->Shutdown(reason);
 }
 
 DWORD createmove_ebp;
 int flctr = 0;
-extern "C" bool c_baseplayer_isattacking(C_BasePlayer *pl) {
+bool c_baseplayer_isattacking_d(C_BasePlayer *pl, bool d) {
 	auto wep = getptr_icliententitylist()->GetClientEntityFromHandle(*(CBaseHandle *)((DWORD)pl + 0x0DA8));
 	if (wep) {
-		auto svtime = *(int *)((DWORD)pl + 0x1138 ) * globals_ptr->interval_per_tick;
+		auto svtime = (*(int *)((DWORD)pl + 0x1138 ) - (d ? 1 : 0)) * globals_ptr->interval_per_tick;
 		return *(float *)((DWORD)wep + 0x09DC) <= svtime;
 	}
 	return false;
 }
+extern "C" bool c_baseplayer_isattacking(C_BasePlayer *pl) {
+	return c_baseplayer_isattacking_d(pl, false);
+}
+
 extern "C" IClientEntityList * getptr_icliententitylist ();
 extern "C" int FAKELAG = 0;
 void __stdcall hooked_createmove_trampoline( int sequence_number, float input_sample_frametime, bool active )
 {
+		int createmove_ebp;
 		__asm {
 			mov createmove_ebp, ebp
 		}
@@ -1798,7 +1810,7 @@ void __stdcall hooked_createmove_trampoline( int sequence_number, float input_sa
 
 		if (FAKELAG) {
 			bool shooting = true;
-			if (c_baseplayer_isattacking(me)) {
+			if (c_baseplayer_isattacking_d(me, true)) {
 				shooting = false;
 			}
 			if (flctr >= FAKELAG || (!shooting)) {
@@ -1809,11 +1821,12 @@ void __stdcall hooked_createmove_trampoline( int sequence_number, float input_sa
 				flctr++;
 			}
 		}
-		else {
-			if (pCommand->buttons & 1 && c_baseplayer_isattacking(me)) {
+		/*else {
+			if (pCommand->buttons & 1 && c_baseplayer_isattacking_d(me, true)) {
+
 				*sendPacket = false; // silentaim
-			}
-		}
+			} 
+		}*/
 
 	CVerifiedUserCmd *pSafeCommand = *reinterpret_cast<CVerifiedUserCmd**>((size_t)CINPUT_PTR + 0xC8) + (sequence_number%90);
 	pSafeCommand->m_cmd = *pCommand;
@@ -1827,8 +1840,32 @@ void __stdcall hooked_extramousesample_trampoline( float input_sample_frametime,
 	REAL_EXTRAMOUSESAMPLE(input_sample_frametime, active);
 }
 
-extern "C" Vector c_baseentity_getvelocity(C_BaseEntity *ent) {
-	return ent->GetBaseVelocity() + ent->GetLocalVelocity();
+extern "C" void c_baseentity_getvelocity(C_BaseEntity *ent, Vector *vec) {
+	/*static Vector old;
+	static int oldt;
+	static Vector oldv;
+	if (globals_ptr->tickcount == oldt) {
+		*vec = oldv;
+		return;
+	}
+	*vec = (*(Vector*)((DWORD)ent + 0x0360) - old) / ((globals_ptr->tickcount - oldt)*globals_ptr->interval_per_tick);
+	old = *(Vector*)((DWORD)ent + 0x0360);
+	oldt = globals_ptr->tickcount;
+	oldv = *vec;*/
+    typedef void (__thiscall* EstimateAbsVelocityFn)( IClientEntity* thisptr, Vector& vel );
+    static EstimateAbsVelocityFn pfnEstimateAbsVelocity = NULL;
+    if ( !pfnEstimateAbsVelocity )
+    {
+        pfnEstimateAbsVelocity = (EstimateAbsVelocityFn) (dwFindPattern(
+            (DWORD)GetModuleHandle("client.dll"), 0x690000,
+            //(PBYTE)"\x55\x8B\xEC\x83\xEC\x0C\x56\x8B\xF1\xE8\x00\x00\x00\x00\x3B\xF0", "xx????xxxx"));
+			(PBYTE)"\x55\x8B\xEC\x83\xEC\x0C\x56\x8B\xF1\xE8\xF2\xFC\x00\x00\x3B\xF0", "xxxxxxxxxx"));
+   
+        if(!pfnEstimateAbsVelocity)
+            return;
+    }
+	//fprintf(logfile, "%p\n", pfnEstimateAbsVelocity);
+    pfnEstimateAbsVelocity( ent, *vec );
 }
 
 bool __fastcall hooked_netchannel_senddatagram_trampoline(INetChannel *chan, int ignoreme, bf_write *data) {
@@ -1872,9 +1909,15 @@ extern "C" ICvar * getptr_icvar(CreateInterfaceFn unused) {
 	return ptr;
 }
 
-extern "C" float get_current_latency(IVEngineClient *engine) {
-	float netlag = get_current_inetchannel(engine)->GetLatency(0);
-	return netlag;
+extern "C" float get_current_latency(IVEngineClient *engine, int direction) {
+	static ConVar *interpvar = NULL;
+	if (!interpvar) interpvar = getptr_icvar(NULL)->FindVar("cl_interp");
+	auto c = get_current_inetchannel(engine);
+	float netlago = (direction & 1) ? c->GetLatency(0) : 0.0;
+	//float interpo = c->GetCommandInterpolationAmount(0, c->GetSequenceNr(0));
+	float netlagi = (direction & 2) ? c->GetLatency(1) : 0.0;
+	//float interpi = c->GetCommandInterpolationAmount(1, c->GetSequenceNr(1));
+	return netlago + netlagi + interpvar->GetFloat();
 }
 
 DWORD WINAPI startup_thread( LPVOID lpArguments ) {
@@ -2437,4 +2480,9 @@ bool KeyValues::Dump( IKeyValuesDumpContext *pDump, int nIndentLevel /* = 0 */ )
 	}
 
 	return pDump->KvEndKey( this, nIndentLevel );
+}
+extern "C" float get_gravity() {
+	static ConVar *gravvar = NULL;
+	if (!gravvar) gravvar = getptr_icvar(NULL)->FindVar("sv_gravity");
+	return gravvar->GetFloat();
 }

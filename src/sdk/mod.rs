@@ -203,6 +203,7 @@ pub struct cplane_t {
 	pad: [u8, ..2]
 }
 #[deriving(Show)]
+#[repr(C)]
 pub struct Vector {
 	pub x: libc::c_float,
 	pub y: libc::c_float,

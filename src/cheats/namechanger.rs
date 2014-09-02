@@ -1,4 +1,5 @@
 use core::prelude::*;
+use collections::MutableSeq;
 use Cheat;
 use sdk;
 use GamePointers;

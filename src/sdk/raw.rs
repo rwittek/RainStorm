@@ -90,7 +90,7 @@ extern "C" {
 	pub fn c_baseentity_worldspacecenter(ent: C_BaseEntityPtr) -> Vector;
 	pub fn c_baseentity_getindex(ent: C_BaseEntityPtr) -> libc::c_int;
 	pub fn c_baseentity_getclassname(ent: C_BaseEntityPtr) -> *const libc::c_char;
-	pub fn c_baseentity_getvelocity(ent: C_BaseEntityPtr) -> Vector;
+	pub fn c_baseentity_getvelocity(ent: C_BaseEntityPtr, out: &mut Vector);
 	pub fn c_baseentity_interpolate(ent: C_BaseEntityPtr, time: libc::c_float);
 	pub fn getptr_ivmodelinfo() -> IVModelInfoPtr;
 	
@@ -119,7 +119,8 @@ extern "C" {
 	//pub fn create_tracefilter_from_predicate(predicate: extern "C" pub fn(ent: *const IHandleEntity, contentsmask: i32) -> bool) -> PredicateTraceFilter;
 	pub fn is_shoot_critical(seed: libc::c_int, wep: C_BaseEntityPtr) -> bool;
 	pub fn get_current_inetchannel(engine: IVEngineClientPtr) -> INetChannelPtr;
-	pub fn get_current_latency(engine: IVEngineClientPtr) -> libc::c_float;
+	pub fn get_current_latency(engine: IVEngineClientPtr, direction: libc::c_int) -> libc::c_float;
+	pub fn get_gravity() -> libc::c_float;
 	pub fn get_netchannel_senddatagram_trampoline() -> *const ();
 	pub fn get_hooked_getusercmd() -> *const ();
 	pub fn get_hooked_servercmdkeyvalues() -> *const ();

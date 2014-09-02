@@ -14,7 +14,9 @@ pub trait Entity: core::kinds::Copy {
 		unsafe { raw::c_baseentity_worldspacecenter(self.get_ptr()) }
 	}
 	fn get_velocity(&self) -> Vector {
-		unsafe { raw::c_baseentity_getvelocity(self.get_ptr()) }
+		let mut v = Vector { x: 0.0, y: 0.0, z: 0.0 };
+		unsafe { raw::c_baseentity_getvelocity(self.get_ptr(), &mut v) }
+		v
 	}
 	fn interpolate(&self, time: f32) {
 		unsafe { raw::c_baseentity_interpolate(self.get_ptr(), time) }
@@ -118,6 +120,17 @@ impl TFPlayer {
 	pub fn get_health(&self) -> i32 {
 		unsafe { *self.ptr_offset(0x00A4) }
 	}
+	// cond, ex1, ex2
+	pub fn get_conds(&self) -> (u32, u32, u32) {
+		unsafe { 
+			(
+				*self.ptr_offset(0x17AC + 0x048C),
+				*self.ptr_offset(0x0490),
+				*self.ptr_offset(0x0494)
+			)
+		}
+	}
+		
 }
 impl Entity for TFPlayer {
 	fn get_ptr(&self) -> raw::C_BaseEntityPtr {
